@@ -12,7 +12,7 @@ class Preprocessor:
         df_numeric = df.select_dtypes(include=[np.number])
         
         if df_numeric.empty:
-            raise ValueError("У файлі немає числових колонок!")
+            raise ValueError("There are no numeric columns in the file!")
             
         data_imputed = self.imputer.fit_transform(df_numeric)
         return pd.DataFrame(data_imputed, columns=df_numeric.columns)

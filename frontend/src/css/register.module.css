@@ -1,0 +1,118 @@
+.authContainer {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  position: relative;
+  background-color: #e9ecef;
+  margin: 0;
+  padding: 20px;
+  overflow: hidden;
+}
+
+.authCard {
+  position: relative;
+  z-index: 10;
+  background-color: #ffffff;
+  width: 100%;
+  max-width: 400px;
+  padding: 40px;
+  border-radius: 4px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
+  border-top: 5px solid #d90429;
+}
+
+.authHeader {
+  text-align: center;
+  margin-bottom: 30px;
+}
+
+.authHeader h2 {
+  color: #121212;
+  font-size: 1.6rem;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.authHeader p {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.authForm {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.inputGroup label {
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: #333;
+  text-transform: uppercase;
+}
+
+.inputGroup input {
+  padding: 12px;
+  border: 1px solid #ccc;
+  border-radius: 4px;
+  font-size: 1rem;
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.inputGroup input:focus {
+  outline: none;
+  border-color: #d90429;
+  color: #000000 !important;
+}
+
+.authButton {
+  background-color: #d90429;
+  color: #ffffff;
+  padding: 14px;
+  border: none;
+  border-radius: 4px;
+  font-size: 1rem;
+  font-weight: bold;
+  cursor: pointer;
+  text-transform: uppercase;
+  margin-top: 10px;
+  transition: background 0.3s ease;
+}
+
+.authButton:hover {
+  background-color: #ef233c;
+}
+
+.authFooter {
+  text-align: center;
+  margin-top: 25px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.authFooter a {
+  color: #d90429;
+  text-decoration: none;
+  font-weight: bold;
+}
+
+.errorMsg {
+  padding: 10px 14px;
+  background: #fff0f0;
+  border: 1px solid #ffcdd2;
+  border-left: 3px solid #d90429;
+  border-radius: 4px;
+  color: #c62828;
+  font-size: 0.85rem;
+}
