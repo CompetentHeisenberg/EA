@@ -204,7 +204,7 @@ async def get_correlation(
 
         session = AnalysisSession(
             user_id=current_user.id,
-            file_name="—",
+            file_name=request.file_name,
             file_rows=result["observations"],
             file_cols=len(result["tickers"]),
             analysis_type="correlation",
@@ -224,8 +224,8 @@ async def get_correlation(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@router.post("/analyze", response_model=AnalysisResponse)
-async def analyze_data(
+@router.post("/analysis/pca")
+async def get_pca(
     request: AnalysisRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -243,7 +243,7 @@ async def analyze_data(
 
         session = AnalysisSession(
             user_id=current_user.id,
-            file_name="—",
+            file_name=request.file_name,
             file_rows=len(df),
             file_cols=len(df.columns),
             analysis_type="pca",
@@ -284,3 +284,35 @@ async def get_history(
         }
         for s in sessions
     ]
+
+@router.get("/history/{session_id}")
+async def get_history_result(
+    session_id: int,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    query = (
+        select(AnalysisSession, AnalysisResult)
+        .join(AnalysisResult, AnalysisSession.id == AnalysisResult.session_id)
+        .where(
+            AnalysisSession.id == session_id,
+            AnalysisSession.user_id == current_user.id
+        )
+    )
+    row = await db.execute(query)
+    data = row.first()
+
+    if not data:
+        raise HTTPException(status_code=404, detail="Result not found")
+
+    session, analysis_result = data
+
+    return {
+        "session": {
+            "id": session.id,
+            "file_name": session.file_name,
+            "analysis_type": session.analysis_type,
+            "created_at": session.created_at.isoformat() if session.created_at else None,
+        },
+        "result": analysis_result.result_data
+    }

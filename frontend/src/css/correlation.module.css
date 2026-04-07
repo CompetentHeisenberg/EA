@@ -408,6 +408,8 @@
   margin-bottom: 10px;
   padding-bottom: 6px;
   border-bottom: 1px solid #dee2e6;
+  white-space: normal;
+  word-break: break-word;
 }
 
 .statRow {

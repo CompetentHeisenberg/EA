@@ -1,5 +1,4 @@
 import React, { useState, useCallback } from "react";
-import { fetchCorrelationMatrix } from "../services/api";
 import styles from "../css/correlation.module.css";
 
 function corrToColor(value) {
@@ -61,6 +60,9 @@ export default function CorrelationPage() {
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    const token = localStorage.getItem("token");
+
     setFileName(file.name);
     setUploadStatus("loading");
     setUploadMessage("File processing...");
@@ -73,12 +75,21 @@ export default function CorrelationPage() {
     try {
       const response = await fetch("/api/upload", {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: formData,
       });
+
+      if (response.status === 401) {
+        throw new Error("Authorization error: Please log in again.");
+      }
+
       if (!response.ok) {
         const err = await response.json();
         throw new Error(err.detail || "Loading Error");
       }
+
       const result = await response.json();
       setUploadedData(result.data);
       setColumns(result.columns);
@@ -118,19 +129,42 @@ export default function CorrelationPage() {
       setError("Choose at least 2 columns");
       return;
     }
+    const token = localStorage.getItem("token");
+
     setLoading(true);
     setError(null);
     setCorrData(null);
     try {
       const colData = recordsToColumns(uploadedData, selectedCols);
-      const result = await fetchCorrelationMatrix(colData);
+      const response = await fetch("/api/analysis/correlation", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          data: colData,
+          file_name: fileName || "Unknown file",
+        }),
+      });
+
+      if (response.status === 401) {
+        throw new Error("Session expired. Please log in again.");
+      }
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.detail || "Analysis Error");
+      }
+
+      const result = await response.json();
       setCorrData(result);
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [selectedCols, uploadedData]);
+  }, [selectedCols, uploadedData, fileName]);
 
   const hoveredInfo =
     hoveredCell && corrData
@@ -269,7 +303,7 @@ export default function CorrelationPage() {
                 <div
                   className={styles.heatmap}
                   style={{
-                    gridTemplateColumns: `110px repeat(${corrData.tickers.length}, 1fr)`,
+                    gridTemplateColumns: `max-content repeat(${corrData.tickers.length}, 1fr)`,
                   }}
                 >
                   <div className={styles.cornerCell} />
@@ -356,19 +390,19 @@ export default function CorrelationPage() {
                   <div key={col} className={styles.statCard}>
                     <div className={styles.statCardTitle}>{col}</div>
                     <div className={styles.statRow}>
-                      <span>Середнє</span>
+                      <span>Mean</span>
                       <span>{s.mean}</span>
                     </div>
                     <div className={styles.statRow}>
-                      <span>Ст. відх.</span>
+                      <span>Std. dev.</span>
                       <span>{s.std}</span>
                     </div>
                     <div className={styles.statRow}>
-                      <span>Мін</span>
+                      <span>Min</span>
                       <span>{s.min}</span>
                     </div>
                     <div className={styles.statRow}>
-                      <span>Макс</span>
+                      <span>Max</span>
                       <span>{s.max}</span>
                     </div>
                   </div>

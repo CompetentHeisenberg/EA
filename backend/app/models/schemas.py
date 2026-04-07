@@ -5,7 +5,7 @@ from typing import List, Dict, Any
 class AnalysisRequest(BaseModel):
     data: List[Dict[str, Any]]
     n_clusters: int = 3
-
+    file_name: str = "Unknown file"
 
 class AnalysisResponse(BaseModel):
     clusters: List[int]
@@ -15,3 +15,4 @@ class AnalysisResponse(BaseModel):
 
 class CorrelationRequest(BaseModel):
     data: Dict[str, List[float]]
+    file_name: str = "Unknown file"

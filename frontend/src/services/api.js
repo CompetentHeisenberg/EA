@@ -67,7 +67,7 @@ export const fetchCorrelationMatrix = async (data) => {
 };
 
 export const fetchPCAAnalysis = async (data, nClusters = 3) => {
-  const response = await authFetch("/api/analyze", {
+  const response = await authFetch("/api/analysis/pca", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ data, n_clusters: nClusters }),
@@ -100,5 +100,11 @@ export const updateSettings = async (settings) => {
     body: JSON.stringify(settings),
   });
   if (!response.ok) throw new Error("Error saving settings");
+  return response.json();
+};
+
+export const fetchHistoryResult = async (sessionId) => {
+  const response = await authFetch(`/api/history/${sessionId}`);
+  if (!response.ok) throw new Error("Results not found");
   return response.json();
 };

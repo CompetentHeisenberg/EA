@@ -2,6 +2,9 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import Main from "./pages/Main";
 import Login from "./pages/Login";
 import Registration from "./pages/Registration";
+import ProfilePage from "./pages/ProfilePage";
+import HistoryDetailPage from "./pages/HistoryDetailPage";
+import HistoryPage from "./pages/HistoryPage";
 import CorrelationPage from "./pages/CorrelationPage";
 import PCAPage from "./pages/PCAPage";
 
@@ -29,14 +32,6 @@ function App() {
           }
         />
         <Route
-          path="/correlation"
-          element={
-            <PrivateRoute>
-              <CorrelationPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
           path="/pca"
           element={
             <PrivateRoute>
@@ -44,7 +39,38 @@ function App() {
             </PrivateRoute>
           }
         />
-
+        <Route
+          path="/profile"
+          element={
+            <PrivateRoute>
+              <ProfilePage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/history/:id"
+          element={
+            <PrivateRoute>
+              <HistoryDetailPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/history"
+          element={
+            <PrivateRoute>
+              <HistoryPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/correlation"
+          element={
+            <PrivateRoute>
+              <CorrelationPage />
+            </PrivateRoute>
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

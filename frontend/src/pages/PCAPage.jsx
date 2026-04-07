@@ -47,6 +47,8 @@ export default function PCAPage() {
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    const token = localStorage.getItem("token");
     setFileName(file.name);
     setUploadStatus("loading");
     setResult(null);
@@ -58,22 +60,32 @@ export default function PCAPage() {
     try {
       const response = await fetch("/api/upload", {
         method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
         body: formData,
       });
+
+      if (response.status === 401) {
+        throw new Error("Authorization error: Please log in again.");
+      }
+
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.detail);
+        throw new Error(err.detail || "Upload failed");
       }
+
       const res = await response.json();
       setUploadedData(res.data);
       setColumns(res.columns);
+
       const numeric = res.columns.filter(
         (col) => !isNaN(parseFloat(res.data[0]?.[col])),
       );
       setSelectedCols(numeric.slice(0, 8));
       setUploadStatus("success");
       setUploadMessage(
-        `${res.data.length} рядків · ${res.columns.length} колонок`,
+        `${res.data.length} rows · ${res.columns.length} columns`,
       );
     } catch (err) {
       setUploadStatus("error");
@@ -95,24 +107,35 @@ export default function PCAPage() {
 
   const handleAnalyze = useCallback(async () => {
     if (selectedCols.length < 2) {
-      setError("Оберіть щонайменше 2 колонки");
+      setError("Please select at least 2 columns");
       return;
     }
+
+    const token = localStorage.getItem("token");
     setLoading(true);
     setError(null);
     setResult(null);
 
     try {
       const matrix = recordsToMatrix(uploadedData, selectedCols);
-      const response = await fetch("/api/analyze", {
+      const response = await fetch("/api/analysis/pca", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({ data: matrix, n_clusters: nClusters }),
       });
+
+      if (response.status === 401) {
+        throw new Error("Session expired. Please log in again.");
+      }
+
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.detail);
+        throw new Error(err.detail || "Analysis failed");
       }
+
       const data = await response.json();
       setResult(data);
       setAxisX("PC1");
@@ -177,7 +200,7 @@ export default function PCAPage() {
     ctx.stroke();
 
     ctx.fillStyle = "#868e96";
-    ctx.font = "bold 12px 'Helvetica Neue', Arial, sans-serif";
+    ctx.font = "bold 12px sans-serif";
     ctx.textAlign = "center";
     ctx.fillText(xKey, W / 2, H - 10);
     ctx.save();
@@ -200,7 +223,7 @@ export default function PCAPage() {
       ctx.fill();
       if (isHovered) {
         ctx.strokeStyle = "#121212";
-        ctx.lineWidth = 1.5;
+        ctx.lineWidth = 2;
         ctx.stroke();
       }
       ctx.globalAlpha = 1;
@@ -232,7 +255,7 @@ export default function PCAPage() {
     const toCanvasY = (v) => H - PAD - ((v - yMin) / yRange) * (H - PAD * 2);
 
     let closest = null,
-      minDist = 16;
+      minDist = 20;
     result.pca_data.forEach((point, idx) => {
       const cx = toCanvasX(point[xKey] ?? 0);
       const cy = toCanvasY(point[yKey] ?? 0);
@@ -252,10 +275,10 @@ export default function PCAPage() {
       <div className={styles.pageHeader}>
         <div className={styles.pageHeaderInner}>
           <div>
-            <h1 className={styles.pageTitle}>PCA та кластерний аналіз</h1>
+            <h1 className={styles.pageTitle}>PCA & Cluster Analysis</h1>
             <p className={styles.pageDesc}>
-              Метод головних компонент · K-Means кластеризація · Візуалізація у
-              зниженому просторі
+              Principal Component Analysis · K-Means Clustering · Dimensionality
+              Reduction
             </p>
           </div>
         </div>
@@ -265,7 +288,7 @@ export default function PCAPage() {
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
             <span className={styles.sectionNum}>01</span>
-            <h2 className={styles.sectionTitle}>Завантаження даних</h2>
+            <h2 className={styles.sectionTitle}>Data Loading</h2>
           </div>
           <div
             className={`${styles.dropZone} ${uploadStatus === "success" ? styles.dropZoneSuccess : ""} ${uploadStatus === "error" ? styles.dropZoneError : ""}`}
@@ -283,7 +306,7 @@ export default function PCAPage() {
             {uploadStatus === "loading" ? (
               <div className={styles.uploadState}>
                 <div className={styles.spinner} />
-                <span>Обробляю файл...</span>
+                <span>Processing file...</span>
               </div>
             ) : uploadStatus === "success" ? (
               <div className={styles.uploadState}>
@@ -292,41 +315,36 @@ export default function PCAPage() {
                   <span className={styles.uploadFileName}>{fileName}</span>
                   <span className={styles.uploadMeta}>{uploadMessage}</span>
                 </div>
-                <span className={styles.replaceHint}>
-                  Клікніть щоб замінити
-                </span>
+                <span className={styles.replaceHint}>Click to replace</span>
               </div>
             ) : (
               <div className={styles.uploadState}>
                 <div className={styles.uploadArrow}>↑</div>
                 <div className={styles.uploadInfo}>
                   <span className={styles.uploadCta}>
-                    Перетягніть файл або клікніть для вибору
+                    Drag file or click to select
                   </span>
                   <span className={styles.uploadMeta}>CSV, XLSX, XLS</span>
                 </div>
               </div>
             )}
           </div>
-          {uploadStatus === "error" && (
-            <div className={styles.errorBanner}>{uploadMessage}</div>
-          )}
         </div>
 
         {numericCols.length > 0 && (
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <span className={styles.sectionNum}>02</span>
-              <h2 className={styles.sectionTitle}>Параметри аналізу</h2>
+              <h2 className={styles.sectionTitle}>Analysis Parameters</h2>
               <span className={styles.sectionHint}>
-                Обрано колонок: {selectedCols.length}
+                Selected: {selectedCols.length}
               </span>
             </div>
 
             <div className={styles.settingsRow}>
               <div className={styles.settingsBlock}>
                 <label className={styles.settingsLabel}>
-                  Змінні для аналізу
+                  Variables for Analysis
                 </label>
                 <div className={styles.pillGrid}>
                   {numericCols.map((col) => (
@@ -343,7 +361,7 @@ export default function PCAPage() {
 
               <div className={styles.settingsBlock} style={{ minWidth: 180 }}>
                 <label className={styles.settingsLabel}>
-                  Кількість кластерів (k)
+                  Number of Clusters (k)
                 </label>
                 <div className={styles.clusterBtns}>
                   {[2, 3, 4, 5, 6].map((k) => (
@@ -364,19 +382,9 @@ export default function PCAPage() {
               onClick={handleAnalyze}
               disabled={loading || selectedCols.length < 2}
             >
-              {loading ? (
-                <>
-                  <div className={styles.btnSpinner} /> Аналізую...
-                </>
-              ) : (
-                "Запустити PCA + кластеризацію"
-              )}
+              {loading ? "Analyzing..." : "Run PCA + Clustering"}
             </button>
-            {error && (
-              <div className={styles.errorBanner} style={{ marginTop: 12 }}>
-                {error}
-              </div>
-            )}
+            {error && <div className={styles.errorBanner}>{error}</div>}
           </div>
         )}
 
@@ -385,9 +393,9 @@ export default function PCAPage() {
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
                 <span className={styles.sectionNum}>03</span>
-                <h2 className={styles.sectionTitle}>Пояснена дисперсія</h2>
+                <h2 className={styles.sectionTitle}>Explained Variance</h2>
                 <span className={styles.sectionHint}>
-                  Сумарно:{" "}
+                  Total:{" "}
                   {(result.variance.reduce((a, b) => a + b, 0) * 100).toFixed(
                     1,
                   )}
@@ -412,13 +420,11 @@ export default function PCAPage() {
               </div>
             </div>
 
-            {/* Scatter plot */}
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
                 <span className={styles.sectionNum}>04</span>
-                <h2 className={styles.sectionTitle}>Scatter plot</h2>
+                <h2 className={styles.sectionTitle}>Projection Plot</h2>
                 <div className={styles.axisSelectors}>
-                  <span className={styles.axisLabel}>X:</span>
                   <select
                     className={styles.axisSelect}
                     value={axisX}
@@ -428,7 +434,6 @@ export default function PCAPage() {
                       <option key={k}>{k}</option>
                     ))}
                   </select>
-                  <span className={styles.axisLabel}>Y:</span>
                   <select
                     className={styles.axisSelect}
                     value={axisY}
@@ -451,14 +456,13 @@ export default function PCAPage() {
                   onMouseLeave={() => setHoveredPoint(null)}
                 />
 
-                {/* Tooltip */}
                 {hoveredPoint !== null && (
                   <div className={styles.tooltip}>
                     <div className={styles.tooltipTitle}>
-                      Спостереження #{hoveredPoint + 1}
+                      Observation #{hoveredPoint + 1}
                     </div>
                     <div className={styles.tooltipRow}>
-                      <span>Кластер</span>
+                      <span>Cluster</span>
                       <span
                         style={{
                           color:
@@ -483,41 +487,19 @@ export default function PCAPage() {
                   </div>
                 )}
               </div>
-
-              {/* Cluster legend */}
-              <div className={styles.clusterLegend}>
-                {Array.from({ length: nClusters }, (_, i) => (
-                  <div key={i} className={styles.legendItem}>
-                    <div
-                      className={styles.legendDot}
-                      style={{
-                        background: CLUSTER_COLORS[i % CLUSTER_COLORS.length],
-                      }}
-                    />
-                    <span>
-                      Кластер {i + 1} (
-                      {result.clusters.filter((c) => c === i).length} об.)
-                    </span>
-                  </div>
-                ))}
-              </div>
             </div>
 
-            {/* Data table */}
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
                 <span className={styles.sectionNum}>05</span>
-                <h2 className={styles.sectionTitle}>Таблиця результатів</h2>
-                <span className={styles.sectionHint}>
-                  {result.pca_data.length} спостережень
-                </span>
+                <h2 className={styles.sectionTitle}>Results Table</h2>
               </div>
               <div className={styles.tableWrapper}>
                 <table className={styles.table}>
                   <thead>
                     <tr>
                       <th>#</th>
-                      <th>Кластер</th>
+                      <th>Cluster</th>
                       {pcaKeys.map((k) => (
                         <th key={k}>{k}</th>
                       ))}
@@ -555,11 +537,6 @@ export default function PCAPage() {
                   </tbody>
                 </table>
               </div>
-              {result.pca_data.length > 50 && (
-                <p className={styles.tableNote}>
-                  Show first 50 of {result.pca_data.length} rows
-                </p>
-              )}
             </div>
           </>
         )}
