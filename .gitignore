@@ -26,3 +26,4 @@ dist-ssr
 *.pyo
 *.pyd
 .env
+temp_data

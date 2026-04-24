@@ -85,7 +85,31 @@
 .sectionHint {
   font-size: 0.8rem;
   color: #868e96;
+}
+
+.actionBtnGroup {
   margin-left: auto;
+  display: flex;
+  gap: 8px;
+}
+
+.actionBtn {
+  padding: 6px 14px;
+  border: 1px solid #dee2e6;
+  border-radius: 3px;
+  background: #f8f9fa;
+  color: #495057;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.actionBtn:hover {
+  border-color: #d90429;
+  color: #d90429;
+  background: #fff5f5;
 }
 
 .dropZone {
@@ -271,7 +295,9 @@
 
 .heatmapWrapper {
   overflow-x: auto;
+  max-width: 100%;
   margin-bottom: 12px;
+  position: relative;
 }
 
 .heatmap {
@@ -280,7 +306,19 @@
   min-width: fit-content;
 }
 
+.cornerCell {
+  position: sticky;
+  left: 0;
+  top: 0;
+  z-index: 20;
+  background-color: #fff;
+}
+
 .headerCell {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background-color: #fff;
   text-align: center;
   font-size: 0.75rem;
   font-weight: 700;
@@ -291,6 +329,10 @@
 }
 
 .rowLabel {
+  position: sticky;
+  left: 0;
+  z-index: 10;
+  background-color: #fff;
   display: flex;
   align-items: center;
   justify-content: flex-end;

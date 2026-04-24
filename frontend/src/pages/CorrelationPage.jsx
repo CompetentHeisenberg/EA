@@ -29,19 +29,9 @@ function significanceLabel(pval) {
   return "";
 }
 
-function recordsToColumns(records, selectedCols) {
-  const result = {};
-  for (const col of selectedCols) {
-    result[col] = records
-      .map((r) => parseFloat(r[col]))
-      .filter((v) => !isNaN(v));
-  }
-  return result;
-}
-
 export default function CorrelationPage() {
-  const [uploadedData, setUploadedData] = useState([]);
-  const [columns, setColumns] = useState([]);
+  const [fileId, setFileId] = useState(null);
+  const [numericCols, setNumericCols] = useState([]);
   const [fileName, setFileName] = useState("");
   const [uploadStatus, setUploadStatus] = useState(null);
   const [uploadMessage, setUploadMessage] = useState("");
@@ -52,11 +42,6 @@ export default function CorrelationPage() {
   const [error, setError] = useState(null);
   const [hoveredCell, setHoveredCell] = useState(null);
 
-  const numericCols = columns.filter((col) => {
-    if (!uploadedData.length) return false;
-    return !isNaN(parseFloat(uploadedData[0][col]));
-  });
-
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -65,7 +50,7 @@ export default function CorrelationPage() {
 
     setFileName(file.name);
     setUploadStatus("loading");
-    setUploadMessage("File processing...");
+    setUploadMessage("Processing file...");
     setCorrData(null);
     setSelectedCols([]);
 
@@ -82,25 +67,24 @@ export default function CorrelationPage() {
       });
 
       if (response.status === 401) {
-        throw new Error("Authorization error: Please log in again.");
+        throw new Error("Authorization error. Please log in again.");
       }
 
       if (!response.ok) {
         const err = await response.json();
-        throw new Error(err.detail || "Loading Error");
+        throw new Error(err.detail || "Upload Error");
       }
 
       const result = await response.json();
-      setUploadedData(result.data);
-      setColumns(result.columns);
-      setSelectedCols(
-        result.columns
-          .filter((col) => !isNaN(parseFloat(result.data[0]?.[col])))
-          .slice(0, 5),
-      );
+      setFileId(result.file_id);
+
+      const numCols = result.numeric_columns || [];
+      setNumericCols(numCols);
+      setSelectedCols(numCols.slice(0, 5));
+
       setUploadStatus("success");
       setUploadMessage(
-        `${result.data.length} rows · ${result.columns.length} columns`,
+        `${result.total_rows} rows · ${result.columns.length} columns`,
       );
     } catch (err) {
       setUploadStatus("error");
@@ -118,7 +102,7 @@ export default function CorrelationPage() {
     setSelectedCols((prev) =>
       prev.includes(col)
         ? prev.filter((c) => c !== col)
-        : prev.length < 10
+        : prev.length < 30
           ? [...prev, col]
           : prev,
     );
@@ -129,13 +113,18 @@ export default function CorrelationPage() {
       setError("Choose at least 2 columns");
       return;
     }
+    if (!fileId) {
+      setError("File ID missing. Please upload the file again.");
+      return;
+    }
+
     const token = localStorage.getItem("token");
 
     setLoading(true);
     setError(null);
     setCorrData(null);
+
     try {
-      const colData = recordsToColumns(uploadedData, selectedCols);
       const response = await fetch("/api/analysis/correlation", {
         method: "POST",
         headers: {
@@ -143,7 +132,8 @@ export default function CorrelationPage() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          data: colData,
+          file_id: fileId,
+          columns: selectedCols,
           file_name: fileName || "Unknown file",
         }),
       });
@@ -164,7 +154,7 @@ export default function CorrelationPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCols, uploadedData, fileName]);
+  }, [selectedCols, fileId, fileName]);
 
   const hoveredInfo =
     hoveredCell && corrData
@@ -181,7 +171,7 @@ export default function CorrelationPage() {
       <div className={styles.pageHeader}>
         <div className={styles.pageHeaderInner}>
           <div>
-            <h1 className={styles.pageTitle}>Correlation analysis</h1>
+            <h1 className={styles.pageTitle}>Correlation Analysis</h1>
             <p className={styles.pageDesc}>
               Pearson correlation matrix · Significance levels · Descriptive
               statistics
@@ -198,7 +188,9 @@ export default function CorrelationPage() {
           </div>
 
           <div
-            className={`${styles.dropZone} ${uploadStatus === "success" ? styles.dropZoneSuccess : ""} ${uploadStatus === "error" ? styles.dropZoneError : ""}`}
+            className={`${styles.dropZone} ${
+              uploadStatus === "success" ? styles.dropZoneSuccess : ""
+            } ${uploadStatus === "error" ? styles.dropZoneError : ""}`}
             onDrop={handleDrop}
             onDragOver={(e) => e.preventDefault()}
             onClick={() => document.getElementById("corrFileInput").click()}
@@ -249,19 +241,33 @@ export default function CorrelationPage() {
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <span className={styles.sectionNum}>02</span>
-              <h2 className={styles.sectionTitle}>
-                Choose columns for analysis
-              </h2>
+              <h2 className={styles.sectionTitle}>Select Variables</h2>
               <span className={styles.sectionHint}>
-                Chosen: {selectedCols.length} / maximum. 10
+                Selected: {selectedCols.length} / Max 30
               </span>
+              <div className={styles.actionBtnGroup}>
+                <button
+                  className={styles.actionBtn}
+                  onClick={() => setSelectedCols(numericCols.slice(0, 30))}
+                >
+                  Select All
+                </button>
+                <button
+                  className={styles.actionBtn}
+                  onClick={() => setSelectedCols([])}
+                >
+                  Clear
+                </button>
+              </div>
             </div>
 
             <div className={styles.pillGrid}>
               {numericCols.map((col) => (
                 <button
                   key={col}
-                  className={`${styles.pill} ${selectedCols.includes(col) ? styles.pillActive : ""}`}
+                  className={`${styles.pill} ${
+                    selectedCols.includes(col) ? styles.pillActive : ""
+                  }`}
                   onClick={() => toggleCol(col)}
                 >
                   {col}
@@ -280,7 +286,7 @@ export default function CorrelationPage() {
                   Analyzing...
                 </>
               ) : (
-                "Construct a correlation matrix"
+                "Construct Correlation Matrix"
               )}
             </button>
 
@@ -293,7 +299,7 @@ export default function CorrelationPage() {
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
                 <span className={styles.sectionNum}>03</span>
-                <h2 className={styles.sectionTitle}>Correlation matrix</h2>
+                <h2 className={styles.sectionTitle}>Correlation Matrix</h2>
                 <span className={styles.sectionHint}>
                   n = {corrData.observations} observations
                 </span>
@@ -329,7 +335,9 @@ export default function CorrelationPage() {
                         return (
                           <div
                             key={j}
-                            className={`${styles.cell} ${isHovered ? styles.cellDim : ""} ${isActive ? styles.cellActive : ""}`}
+                            className={`${styles.cell} ${
+                              isHovered ? styles.cellDim : ""
+                            } ${isActive ? styles.cellActive : ""}`}
                             style={{
                               backgroundColor: corrToColor(val),
                               color: textColor(val),
@@ -383,7 +391,7 @@ export default function CorrelationPage() {
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
                 <span className={styles.sectionNum}>04</span>
-                <h2 className={styles.sectionTitle}>Descriptive statistics</h2>
+                <h2 className={styles.sectionTitle}>Descriptive Statistics</h2>
               </div>
               <div className={styles.statsGrid}>
                 {Object.entries(corrData.descriptive_stats).map(([col, s]) => (

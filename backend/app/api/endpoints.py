@@ -1,18 +1,19 @@
+import os
+import io
+import pandas as pd
+import yfinance as yf
 from fastapi import APIRouter, UploadFile, File, HTTPException, Depends
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from datetime import datetime
+
 from app.services.preprocessor import Preprocessor
 from app.services.statistics_module import StatisticsEngine, compute_correlation_matrix
-from app.models.schemas import AnalysisRequest, AnalysisResponse, CorrelationRequest
+from app.models.schemas import RegisterRequest, TokenResponse, SettingsUpdate, CorrelationRequest, PCARequest
 from app.database import get_db, User, UserSettings, AnalysisSession, AnalysisResult
-from app.auth import (
-    hash_password, verify_password, create_access_token, get_current_user
-)
-from pydantic import BaseModel, EmailStr
-import pandas as pd
-import io
-import yfinance as yf
+from app.auth import hash_password, verify_password, create_access_token, get_current_user
+
 router = APIRouter()
 preprocessor = Preprocessor()
 stats_engine = StatisticsEngine()
@@ -31,6 +32,10 @@ TICKERS = {
     "Microsoft": "MSFT",
     "Amazon": "AMZN",
 }
+
+TEMP_DATA_DIR = "./temp_data"
+os.makedirs(TEMP_DATA_DIR, exist_ok=True)
+
 
 @router.get("/financial")
 async def get_financial_data():
@@ -58,26 +63,13 @@ async def get_financial_data():
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
-class RegisterRequest(BaseModel):
-    email: EmailStr
-    username: str
-    password: str
-
-class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    username: str
-    email: str
-
-
 @router.post("/auth/register", response_model=TokenResponse)
 async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
     existing = await db.execute(
         select(User).where((User.email == data.email) | (User.username == data.username))
     )
     if existing.scalar_one_or_none():
-        raise HTTPException(status_code=400, detail="Email або username вже зайнятий")
+        raise HTTPException(status_code=400, detail="Email or username is already taken")
 
     user = User(
         email=data.email,
@@ -95,7 +87,6 @@ async def register(data: RegisterRequest, db: AsyncSession = Depends(get_db)):
     token = create_access_token({"sub": str(user.id)})
     return TokenResponse(access_token=token, username=user.username, email=user.email)
 
-
 @router.post("/auth/login", response_model=TokenResponse)
 async def login(
     form: OAuth2PasswordRequestForm = Depends(),
@@ -105,26 +96,17 @@ async def login(
     user = result.scalar_one_or_none()
 
     if not user or not verify_password(form.password, user.hashed_password):
-        raise HTTPException(status_code=401, detail="Невірний email або пароль")
+        raise HTTPException(status_code=401, detail="Invalid email or password")
 
-    from datetime import datetime
     user.last_login = datetime.utcnow()
     await db.commit()
 
     token = create_access_token({"sub": str(user.id)})
     return TokenResponse(access_token=token, username=user.username, email=user.email)
 
-
 @router.get("/auth/me")
 async def get_me(current_user: User = Depends(get_current_user)):
     return {"id": current_user.id, "username": current_user.username, "email": current_user.email}
-
-
-class SettingsUpdate(BaseModel):
-    default_clusters: int = 3
-    preferred_pca_axes: str = "PC1,PC2"
-    theme: str = "light"
-
 
 @router.get("/settings")
 async def get_settings(
@@ -134,9 +116,8 @@ async def get_settings(
     result = await db.execute(select(UserSettings).where(UserSettings.user_id == current_user.id))
     settings = result.scalar_one_or_none()
     if not settings:
-        raise HTTPException(status_code=404, detail="Налаштування не знайдені")
+        raise HTTPException(status_code=404, detail="Settings not found")
     return settings
-
 
 @router.put("/settings")
 async def update_settings(
@@ -151,8 +132,7 @@ async def update_settings(
         settings.preferred_pca_axes = data.preferred_pca_axes
         settings.theme = data.theme
         await db.commit()
-    return {"message": "Налаштування збережено"}
-
+    return {"message": "Settings saved"}
 
 @router.post("/upload")
 async def upload_file(
@@ -161,7 +141,7 @@ async def upload_file(
     current_user: User = Depends(get_current_user)
 ):
     if not file.filename.endswith(('.csv', '.xlsx', '.xls')):
-        raise HTTPException(status_code=400, detail="Формат файлу має бути CSV або Excel")
+        raise HTTPException(status_code=400, detail="File format must be CSV or Excel")
 
     try:
         contents = await file.read()
@@ -169,6 +149,11 @@ async def upload_file(
             else pd.read_excel(io.BytesIO(contents))
 
         df_clean = preprocessor.clean_and_validate(df)
+
+        text_cols = df.select_dtypes(exclude=['number', 'bool']).columns
+        for col in text_cols:
+            if col not in df_clean.columns:
+                df_clean[col] = df[col].values
 
         session = AnalysisSession(
             user_id=current_user.id,
@@ -183,15 +168,23 @@ async def upload_file(
         await db.commit()
         await db.refresh(session)
 
+        file_path = os.path.join(TEMP_DATA_DIR, f"{session.id}.parquet")
+        df_clean.to_parquet(file_path, index=False)
+        df_preview = df_clean.head(50).where(pd.notnull(df_clean.head(50)), None)
+        
+        numeric_cols = df_clean.select_dtypes(include=['number']).columns.tolist()
+
         return {
-            "session_id": session.id,
+            "file_id": session.id,
             "columns": df_clean.columns.tolist(),
-            "data": df_clean.head(50).to_dict(orient="records"),
-            "message": f"Завантажено {len(df_clean)} рядків"
+            "numeric_columns": numeric_cols,
+            "total_rows": len(df_clean),
+            "preview_data": df_preview.to_dict(orient="records"),
+            "message": f"Loaded {len(df_clean)} rows"
         }
+        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.post("/analysis/correlation")
 async def get_correlation(
@@ -200,7 +193,20 @@ async def get_correlation(
     current_user: User = Depends(get_current_user)
 ):
     try:
-        result = compute_correlation_matrix(request.data)
+        file_path = os.path.join(TEMP_DATA_DIR, f"{request.file_id}.parquet")
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Data file not found")
+
+        df = pd.read_parquet(file_path)
+
+        missing_cols = [col for col in request.columns if col not in df.columns]
+        if missing_cols:
+            raise HTTPException(status_code=400, detail=f"Columns not found: {missing_cols}")
+
+        df_selected = df[request.columns].dropna()
+        
+        data_dict = {col: df_selected[col].tolist() for col in request.columns}
+        result = compute_correlation_matrix(data_dict)
 
         session = AnalysisSession(
             user_id=current_user.id,
@@ -223,31 +229,48 @@ async def get_correlation(
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-
 @router.post("/analysis/pca")
 async def get_pca(
-    request: AnalysisRequest,
+    request: PCARequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
     try:
-        df = pd.DataFrame(request.data)
-        df_scaled = preprocessor.scale_data(df)
+        file_path = os.path.join(TEMP_DATA_DIR, f"{request.file_id}.parquet")
+        if not os.path.exists(file_path):
+            raise HTTPException(status_code=404, detail="Data file not found")
+
+        df = pd.read_parquet(file_path)
+
+        missing_cols = [col for col in request.columns if col not in df.columns]
+        if missing_cols:
+            raise HTTPException(status_code=400, detail=f"Columns not found: {missing_cols}")
+
+        cols_to_extract = request.columns.copy()
+        if request.label_column and request.label_column in df.columns:
+            cols_to_extract.append(request.label_column)
+
+        df_selected = df[cols_to_extract].dropna()
+
+        df_for_math = df_selected[request.columns]
+        df_scaled = preprocessor.scale_data(df_for_math)
+        
         clusters, pca_df, variance = stats_engine.run_full_analysis(df_scaled, request.n_clusters)
 
         result = {
             "clusters": clusters.tolist(),
             "pca_data": pca_df.to_dict(orient="records"),
-            "variance": variance.tolist()
+            "variance": variance.tolist(),
+            "original_data": df_selected.to_dict(orient="records")
         }
 
         session = AnalysisSession(
             user_id=current_user.id,
             file_name=request.file_name,
-            file_rows=len(df),
-            file_cols=len(df.columns),
+            file_rows=len(df_selected),
+            file_cols=len(request.columns),
             analysis_type="pca",
-            columns_used=df.columns.tolist(),
+            columns_used=request.columns,
             parameters={"n_clusters": request.n_clusters}
         )
         db.add(session)
@@ -259,7 +282,6 @@ async def get_pca(
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
 
 @router.get("/history")
 async def get_history(

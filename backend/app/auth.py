@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.database import get_db, User
 import os
 
-SECRET_KEY = os.getenv("SECRET_KEY", "change-this-in-production-please")
+SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 

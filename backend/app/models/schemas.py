@@ -1,18 +1,31 @@
 from pydantic import BaseModel
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, EmailStr
 
+class RegisterRequest(BaseModel):
+    email: EmailStr
+    username: str
+    password: str
 
-class AnalysisRequest(BaseModel):
-    data: List[Dict[str, Any]]
-    n_clusters: int = 3
-    file_name: str = "Unknown file"
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+    username: str
+    email: str
 
-class AnalysisResponse(BaseModel):
-    clusters: List[int]
-    pca_data: List[Dict[str, Any]]
-    variance: List[float]
-
+class SettingsUpdate(BaseModel):
+    default_clusters: int = 3
+    preferred_pca_axes: str = "PC1,PC2"
+    theme: str = "light"
 
 class CorrelationRequest(BaseModel):
-    data: Dict[str, List[float]]
-    file_name: str = "Unknown file"
+    file_id: int
+    columns: List[str]
+    file_name: str = "Correlation Analysis"
+
+class PCARequest(BaseModel):
+    file_id: int
+    columns: List[str]
+    label_column: Optional[str] = None
+    n_clusters: int = 3
+    file_name: str = "PCA Analysis"
