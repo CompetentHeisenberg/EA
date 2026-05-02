@@ -108,3 +108,31 @@ export const fetchHistoryResult = async (sessionId) => {
   if (!response.ok) throw new Error("Results not found");
   return response.json();
 };
+
+export const fetchNewsFeed = async () => {
+  const response = await fetch("/api/news/feed");
+  if (!response.ok) throw new Error("Error loading news feed");
+  return response.json();
+};
+
+export const extractArticleText = async (url) => {
+  const response = await fetch("/api/news/extract", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ url }),
+  });
+  if (!response.ok) throw new Error("Error extracting article");
+  return response.json();
+};
+
+export const fetchTrendingData = async () => {
+  const response = await fetch("/api/trending");
+  if (!response.ok) throw new Error("Error loading trending data");
+  return response.json();
+};
+
+export const fetchMarkets = async () => {
+  const response = await fetch("api/markets");
+  if (!response.ok) throw new Error("Network error");
+  return response.json();
+};

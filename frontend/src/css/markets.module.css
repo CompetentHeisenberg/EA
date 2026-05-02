@@ -1,0 +1,528 @@
+.marketsPage {
+  flex: 1;
+  padding: 32px 36px;
+  background-color: #fff;
+  min-width: 0;
+  overflow-x: hidden;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+
+.pageTitle {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  margin: 0 0 4px 0;
+}
+
+.pageSubtitle {
+  font-size: 0.8rem;
+  color: #888;
+  margin: 0;
+}
+
+.exportGroup {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.exportBtn {
+  background: #d90429;
+  color: #fff;
+  border: none;
+  padding: 8px 18px;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.3px;
+  transition:
+    background 0.2s,
+    transform 0.1s;
+}
+
+.exportBtn:hover {
+  background: #b8021f;
+  transform: translateY(-1px);
+}
+
+.exportBtn:disabled {
+  background: #ccc;
+  cursor: default;
+  transform: none;
+}
+
+.indicesBar {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.indexCard {
+  background: #f7f7f7;
+  border: 1px solid #eee;
+  border-top: 3px solid #d90429;
+  border-radius: 6px;
+  padding: 12px 14px;
+}
+
+.indexName {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #888;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.indexVal {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  font-family: "Courier New", monospace;
+  margin-bottom: 2px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.sectorTabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.sectorTab {
+  background: #f0f0f0;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #555;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.sectorTab:hover {
+  background: #e0e0e0;
+  color: #222;
+}
+
+.sectorTabActive {
+  background: #d90429;
+  border: none;
+  padding: 6px 14px;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+}
+
+.rightControls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.searchInput {
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  color: #333;
+  outline: none;
+  width: 220px;
+  transition: border 0.2s;
+}
+
+.searchInput:focus {
+  border-color: #d90429;
+}
+
+.viewToggle {
+  display: flex;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.viewBtn {
+  background: #fff;
+  border: none;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #666;
+  cursor: pointer;
+}
+
+.viewBtnActive {
+  background: #d90429;
+  border: none;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+}
+
+.tableWrap {
+  overflow-x: auto;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+  min-width: 1000px;
+}
+
+.th {
+  background: #1a1a1a;
+  color: #ccc;
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  transition: color 0.15s;
+}
+
+.th:hover {
+  color: #fff;
+}
+
+.sortIcon {
+  color: #555;
+  font-size: 0.7rem;
+  margin-left: 4px;
+}
+
+.sortActive {
+  color: #d90429;
+  font-size: 0.75rem;
+  margin-left: 4px;
+}
+
+.tr {
+  border-bottom: 1px solid #f2f2f2;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.tr:hover {
+  background: #fff5f6;
+}
+
+.tr:last-child {
+  border-bottom: none;
+}
+
+.td {
+  padding: 10px 12px;
+  color: #333;
+  white-space: nowrap;
+}
+
+.symbolCell {
+  padding: 10px 12px;
+  font-weight: 800;
+  font-family: "Courier New", monospace;
+  color: #d90429;
+  font-size: 0.88rem;
+  white-space: nowrap;
+}
+
+.posChange {
+  padding: 10px 12px;
+  color: #00aa55;
+  font-weight: 700;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.negChange {
+  padding: 10px 12px;
+  color: #d90429;
+  font-weight: 700;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.sectorBadge {
+  display: inline-block;
+  background: #f0f0f0;
+  color: #555;
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 7px;
+  border-radius: 3px;
+  letter-spacing: 0.2px;
+}
+
+.sparkline {
+  display: block;
+}
+
+.tableFooter {
+  padding: 10px 16px;
+  font-size: 0.72rem;
+  color: #aaa;
+  background: #fafafa;
+  border-top: 1px solid #f0f0f0;
+  text-align: right;
+}
+
+.cardsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 14px;
+}
+
+.stockCard {
+  background: #fff;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  padding: 14px;
+  cursor: pointer;
+  transition:
+    box-shadow 0.15s,
+    transform 0.15s;
+  border-top: 3px solid #d90429;
+}
+
+.stockCard:hover {
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 10px;
+}
+
+.cardSymbol {
+  font-size: 1rem;
+  font-weight: 800;
+  color: #d90429;
+  font-family: "Courier New", monospace;
+}
+
+.cardName {
+  font-size: 0.72rem;
+  color: #888;
+  margin-top: 2px;
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cardBottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-top: 8px;
+}
+
+.cardPrice {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  font-family: "Courier New", monospace;
+}
+
+.cardMeta {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.68rem;
+  color: #aaa;
+}
+
+.modalOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px;
+  width: 100%;
+  max-width: 640px;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  border-top: 4px solid #d90429;
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.modalClose {
+  position: absolute;
+  top: 14px;
+  right: 16px;
+  background: none;
+  border: none;
+  font-size: 1.1rem;
+  cursor: pointer;
+  color: #888;
+  transition: color 0.15s;
+}
+
+.modalClose:hover {
+  color: #d90429;
+}
+
+.modalHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.modalSymbol {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #d90429;
+  font-family: "Courier New", monospace;
+  margin-right: 10px;
+}
+
+.modalName {
+  font-size: 0.9rem;
+  color: #666;
+  display: block;
+  margin-top: 4px;
+}
+
+.modalPrice {
+  text-align: right;
+}
+
+.modalPriceVal {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  font-family: "Courier New", monospace;
+  display: block;
+}
+
+.detailChart {
+  width: 100%;
+  height: auto;
+  border-radius: 6px;
+  background: #0d0d0d;
+  display: block;
+  margin-bottom: 20px;
+}
+
+.modalMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.metricCard {
+  background: #f7f7f7;
+  border-radius: 6px;
+  padding: 10px 12px;
+  border-left: 3px solid #d90429;
+}
+
+.metricLabel {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+  margin-bottom: 4px;
+}
+
+.metricVal {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #1a1a1a;
+  font-family: "Courier New", monospace;
+}
+
+@media (max-width: 1100px) {
+  .indicesBar {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .modalMetrics {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .marketsPage {
+    padding: 16px;
+  }
+  .indicesBar {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .controls {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .rightControls {
+    flex-wrap: wrap;
+  }
+  .searchInput {
+    width: 100%;
+  }
+  .modalMetrics {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+.loaderSpinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid rgba(255, 255, 255, 0.1);
+  border-left-color: #a50505;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}

@@ -209,3 +209,22 @@
     padding: 20px;
   }
 }
+
+.newsCard:hover .newsHeadline {
+  color: #d90429;
+}
+
+.newsCard {
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.newsCard:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-radius: 6px;
+  padding: 10px;
+  margin-left: -10px;
+  margin-right: -10px;
+}

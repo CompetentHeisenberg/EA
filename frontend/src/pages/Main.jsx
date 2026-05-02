@@ -3,12 +3,13 @@ import { fetchFinancialData } from "../services/api";
 import Ticker from "../components/Mpage/Ticker";
 import Sidebar from "../components/Mpage/Sidebar";
 import NewsFeed from "../components/Mpage/NewsFeed";
+import NewsDetail from "../components/Mpage/NewsDetail";
 import TrendingBar from "../components/Mpage/TrendingBar";
 import styles from "../css/main.module.css";
 
 const Main = () => {
   const [financialData, setFinancialData] = useState([]);
-  const [_, setTickerLoaded] = useState(false);
+  const [selectedNews, setSelectedNews] = useState(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -18,7 +19,6 @@ const Main = () => {
         const data = await fetchFinancialData();
         if (isMounted && Array.isArray(data)) {
           setFinancialData(data);
-          setTickerLoaded(true);
         }
       } catch (error) {
         console.error("Failed to fetch financial data:", error);
@@ -27,12 +27,20 @@ const Main = () => {
 
     loadData();
     const interval = setInterval(loadData, 60000);
-
     return () => {
       isMounted = false;
       clearInterval(interval);
     };
   }, []);
+
+  const handleNewsClick = (newsItem) => {
+    setSelectedNews(newsItem);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const handleBack = () => {
+    setSelectedNews(null);
+  };
 
   return (
     <div className={styles.appContainer}>
@@ -40,7 +48,13 @@ const Main = () => {
 
       <div className={styles.contentArea}>
         <Sidebar />
-        <NewsFeed />
+
+        {selectedNews ? (
+          <NewsDetail item={selectedNews} onBack={handleBack} />
+        ) : (
+          <NewsFeed onNewsClick={handleNewsClick} />
+        )}
+
         <TrendingBar />
       </div>
 

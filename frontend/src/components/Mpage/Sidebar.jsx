@@ -4,7 +4,7 @@ import styles from "../../css/main.module.css";
 const Sidebar = () => (
   <aside className={styles.sidebar}>
     <nav>
-      {["Home", "Markets", "Analysis", "News", "History", "Profile"].map(
+      {["Home", "Markets", "PCA", "Correlation", "History", "Profile"].map(
         (item) => (
           <a
             key={item}
