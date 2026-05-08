@@ -21,7 +21,9 @@ class SettingsUpdate(BaseModel):
 class CorrelationRequest(BaseModel):
     file_id: int
     columns: List[str]
-    file_name: str = "Correlation Analysis"
+    file_name: str
+    method: Optional[str] = "pearson"
+    handle_outliers: Optional[bool] = False
 
 class PCARequest(BaseModel):
     file_id: int

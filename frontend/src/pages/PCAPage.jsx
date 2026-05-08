@@ -27,6 +27,7 @@ export default function PCAPage() {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
   const hoverThrottle = useRef(false);
+  const hasDragged = useRef(false);
 
   const [fileId, setFileId] = useState(null);
   const [columns, setColumns] = useState([]);
@@ -43,6 +44,7 @@ export default function PCAPage() {
   const [error, setError] = useState(null);
 
   const [hoveredPoint, setHoveredPoint] = useState(null);
+  const [lockedPoint, setLockedPoint] = useState(null);
   const [axisX, setAxisX] = useState("PC1");
   const [axisY, setAxisY] = useState("PC2");
 
@@ -127,6 +129,8 @@ export default function PCAPage() {
     setResult(null);
     setPage(0);
     setZoom({ scale: 1, offsetX: 0, offsetY: 0 });
+    setLockedPoint(null);
+    setHoveredPoint(null);
 
     try {
       const response = await fetch("/api/analysis/pca", {
@@ -163,6 +167,7 @@ export default function PCAPage() {
   useEffect(() => {
     setZoom({ scale: 1, offsetX: 0, offsetY: 0 });
     setHoveredPoint(null);
+    setLockedPoint(null);
   }, [axisX, axisY]);
 
   const getTopFeature = useCallback(
@@ -226,6 +231,8 @@ export default function PCAPage() {
       .addAll(chartData);
   }, [chartData]);
 
+  const activePointId = lockedPoint !== null ? lockedPoint : hoveredPoint;
+
   useEffect(() => {
     if (!chartData || !canvasRef.current) return;
 
@@ -287,15 +294,15 @@ export default function PCAPage() {
 
     ctx.globalAlpha = 0.75;
     chartData.forEach(({ cx, cy, color, originalIndex }) => {
-      if (hoveredPoint === originalIndex) return;
+      if (activePointId === originalIndex) return;
       ctx.beginPath();
       ctx.arc(cx, cy, 5 / scale, 0, Math.PI * 2);
       ctx.fillStyle = color;
       ctx.fill();
     });
 
-    if (hoveredPoint !== null) {
-      const activePoint = chartData[hoveredPoint];
+    if (activePointId !== null) {
+      const activePoint = chartData[activePointId];
       if (activePoint) {
         ctx.globalAlpha = 1;
         ctx.beginPath();
@@ -309,7 +316,7 @@ export default function PCAPage() {
     }
 
     ctx.restore();
-  }, [chartData, hoveredPoint, axisX, axisY, zoom, getTopFeature]);
+  }, [chartData, activePointId, axisX, axisY, zoom, getTopFeature]);
 
   const handleMouseDown = (e) => {
     if (!canvasRef.current) return;
@@ -320,6 +327,7 @@ export default function PCAPage() {
     const cursorY = (e.clientY - rect.top) * scaleY;
 
     setIsDragging(true);
+    hasDragged.current = false;
     dragStart.current = {
       x: cursorX - zoom.offsetX,
       y: cursorY - zoom.offsetY,
@@ -328,6 +336,9 @@ export default function PCAPage() {
 
   const handleMouseUp = () => {
     setIsDragging(false);
+    if (!hasDragged.current && hoveredPoint !== null) {
+      setLockedPoint(hoveredPoint);
+    }
   };
 
   const handleCanvasMouseMove = (e) => {
@@ -340,6 +351,7 @@ export default function PCAPage() {
     const cursorY = (e.clientY - rect.top) * scaleY;
 
     if (isDragging) {
+      hasDragged.current = true;
       setZoom((prev) => ({
         ...prev,
         offsetX: cursorX - dragStart.current.x,
@@ -347,6 +359,8 @@ export default function PCAPage() {
       }));
       return;
     }
+
+    if (lockedPoint !== null) return;
 
     if (!tree || hoverThrottle.current) return;
 
@@ -393,6 +407,16 @@ export default function PCAPage() {
       canvas.removeEventListener("wheel", handler);
     };
   }, [handleWheel, result]);
+
+  const handleRowClick = (absoluteIndex) => {
+    setLockedPoint(absoluteIndex);
+    if (wrapperRef.current) {
+      wrapperRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  };
 
   const pcaKeys = result ? Object.keys(result.pca_data[0]) : [];
   const totalPages = result
@@ -631,7 +655,11 @@ export default function PCAPage() {
                 </div>
               </div>
 
-              <div className={styles.chartArea} ref={wrapperRef}>
+              <div
+                className={styles.chartArea}
+                ref={wrapperRef}
+                style={{ position: "relative" }}
+              >
                 <canvas
                   ref={canvasRef}
                   width={CANVAS_WIDTH}
@@ -641,24 +669,52 @@ export default function PCAPage() {
                     touchAction: "none",
                     cursor: isDragging
                       ? "grabbing"
-                      : hoveredPoint !== null
+                      : activePointId !== null && lockedPoint === null
                         ? "pointer"
-                        : "grab",
+                        : "crosshair",
                   }}
                   onMouseDown={handleMouseDown}
                   onMouseUp={handleMouseUp}
                   onMouseLeave={() => {
-                    handleMouseUp();
-                    setHoveredPoint(null);
+                    setIsDragging(false);
+                    if (lockedPoint === null) setHoveredPoint(null);
                   }}
                   onMouseMove={handleCanvasMouseMove}
                 />
 
-                {hoveredPoint !== null && !isDragging && (
+                {activePointId !== null && !isDragging && (
                   <div
                     className={styles.tooltip}
-                    style={{ minWidth: "260px", pointerEvents: "none" }}
+                    style={{
+                      minWidth: "260px",
+                      pointerEvents: lockedPoint !== null ? "auto" : "none",
+                      maxHeight: "350px",
+                      overflowY: "auto",
+                      paddingTop: lockedPoint !== null ? "24px" : "12px",
+                    }}
                   >
+                    {lockedPoint !== null && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setLockedPoint(null);
+                        }}
+                        style={{
+                          position: "absolute",
+                          top: "8px",
+                          right: "8px",
+                          background: "none",
+                          border: "none",
+                          color: "#fff",
+                          fontSize: "18px",
+                          cursor: "pointer",
+                          lineHeight: "1",
+                        }}
+                      >
+                        ✕
+                      </button>
+                    )}
+
                     <div
                       className={styles.tooltipTitle}
                       style={{ color: "#fff", marginBottom: "8px" }}
@@ -676,12 +732,12 @@ export default function PCAPage() {
                             {labelCol}:
                           </span>
                           {result.original_data &&
-                          result.original_data[hoveredPoint]
-                            ? result.original_data[hoveredPoint][labelCol]
+                          result.original_data[activePointId]
+                            ? result.original_data[activePointId][labelCol]
                             : "N/A"}
                         </>
                       ) : (
-                        `Observation #${hoveredPoint + 1}`
+                        `Observation #${activePointId + 1}`
                       )}
                     </div>
 
@@ -691,14 +747,14 @@ export default function PCAPage() {
                         style={{
                           color:
                             CLUSTER_COLORS[
-                              result.clusters[hoveredPoint] %
+                              result.clusters[activePointId] %
                                 CLUSTER_COLORS.length
                             ],
                           fontWeight: 700,
                           fontSize: "14px",
                         }}
                       >
-                        {result.clusters[hoveredPoint] + 1}
+                        {result.clusters[activePointId] + 1}
                       </span>
                     </div>
 
@@ -733,8 +789,8 @@ export default function PCAPage() {
                           <span style={{ color: "#ddd" }}>{col}</span>
                           <span style={{ fontWeight: 800, color: "#fff" }}>
                             {result.original_data &&
-                            result.original_data[hoveredPoint]
-                              ? result.original_data[hoveredPoint][col]
+                            result.original_data[activePointId]
+                              ? result.original_data[activePointId][col]
                               : "N/A"}
                           </span>
                         </div>
@@ -756,7 +812,7 @@ export default function PCAPage() {
                       >
                         <span style={{ color: "#ccc" }}>{k}</span>
                         <span style={{ color: "#fff", fontWeight: 500 }}>
-                          {(result.pca_data[hoveredPoint][k] ?? 0).toFixed(4)}
+                          {(result.pca_data[activePointId][k] ?? 0).toFixed(4)}
                         </span>
                       </div>
                     ))}
@@ -779,6 +835,77 @@ export default function PCAPage() {
               </div>
             </div>
 
+            {result.cluster_metrics && (
+              <div className={styles.section}>
+                <div className={styles.sectionHeader}>
+                  <span className={styles.sectionNum}>★</span>
+                  <h2 className={styles.sectionTitle}>
+                    Cluster Quality Metrics
+                  </h2>
+                  <span className={styles.sectionHint}>
+                    Model accuracy indicators
+                  </span>
+                </div>
+
+                <div className={styles.settingsRow}>
+                  <div
+                    className={styles.settingsBlock}
+                    style={{ flex: 1, display: "flex", gap: "30px" }}
+                  >
+                    <div>
+                      <div
+                        style={{
+                          color: "#868e96",
+                          fontSize: "12px",
+                          textTransform: "uppercase",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Silhouette Score
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "20px",
+                          fontWeight: "bold",
+                          color: "#222",
+                        }}
+                      >
+                        {result.cluster_metrics.silhouette_score}
+                      </div>
+                      <div style={{ color: "#868e96", fontSize: "12px" }}>
+                        Closer to 1 is better (denser clusters)
+                      </div>
+                    </div>
+
+                    <div>
+                      <div
+                        style={{
+                          color: "#868e96",
+                          fontSize: "12px",
+                          textTransform: "uppercase",
+                          marginBottom: "4px",
+                        }}
+                      >
+                        Davies-Bouldin Index
+                      </div>
+                      <div
+                        style={{
+                          fontSize: "20px",
+                          fontWeight: "bold",
+                          color: "#222",
+                        }}
+                      >
+                        {result.cluster_metrics.davies_bouldin_score}
+                      </div>
+                      <div style={{ color: "#868e96", fontSize: "12px" }}>
+                        Lower is better (better separation)
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
                 <span className={styles.sectionNum}>05</span>
@@ -791,9 +918,26 @@ export default function PCAPage() {
                       <th>#</th>
                       {labelCol && <th>{labelCol}</th>}
                       <th>Cluster</th>
-                      {pcaKeys.map((k) => (
-                        <th key={k}>{k}</th>
-                      ))}
+                      {pcaKeys.map((k) => {
+                        const topFeat = getTopFeature(k);
+                        return (
+                          <th key={k}>
+                            {k}
+                            {topFeat && (
+                              <span
+                                style={{
+                                  display: "block",
+                                  fontSize: "11px",
+                                  color: "#888",
+                                  fontWeight: "normal",
+                                }}
+                              >
+                                ({topFeat})
+                              </span>
+                            )}
+                          </th>
+                        );
+                      })}
                     </tr>
                   </thead>
                   <tbody>
@@ -806,12 +950,22 @@ export default function PCAPage() {
                           <tr
                             key={absoluteIndex}
                             className={
-                              hoveredPoint === absoluteIndex
+                              activePointId === absoluteIndex
                                 ? styles.rowHighlight
                                 : ""
                             }
-                            onMouseEnter={() => setHoveredPoint(absoluteIndex)}
-                            onMouseLeave={() => setHoveredPoint(null)}
+                            onMouseEnter={() => {
+                              if (lockedPoint === null) {
+                                setHoveredPoint(absoluteIndex);
+                              }
+                            }}
+                            onMouseLeave={() => {
+                              if (lockedPoint === null) {
+                                setHoveredPoint(null);
+                              }
+                            }}
+                            onClick={() => handleRowClick(absoluteIndex)}
+                            style={{ cursor: "pointer" }}
                           >
                             <td>{absoluteIndex + 1}</td>
                             {labelCol && result.original_data && (

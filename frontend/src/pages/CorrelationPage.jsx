@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useMemo, useRef } from "react";
 import styles from "../css/correlation.module.css";
 
 function corrToColor(value) {
@@ -18,6 +18,24 @@ function corrToColor(value) {
   }
 }
 
+function formatStatValue(val) {
+  if (val === null || val === undefined || isNaN(val)) return "N/A";
+
+  const absVal = Math.abs(val);
+
+  if (absVal >= 1e6) {
+    return new Intl.NumberFormat("en-US", {
+      notation: "compact",
+      compactDisplay: "short",
+      maximumFractionDigits: 2,
+    }).format(val);
+  }
+
+  return new Intl.NumberFormat("en-US", {
+    maximumFractionDigits: 4,
+  }).format(val);
+}
+
 function textColor(value) {
   return Math.abs(value) > 0.6 ? "#fff" : "#222";
 }
@@ -30,17 +48,24 @@ function significanceLabel(pval) {
 }
 
 export default function CorrelationPage() {
+  const heatmapRef = useRef(null);
+
   const [fileId, setFileId] = useState(null);
   const [numericCols, setNumericCols] = useState([]);
   const [fileName, setFileName] = useState("");
   const [uploadStatus, setUploadStatus] = useState(null);
   const [uploadMessage, setUploadMessage] = useState("");
 
+  const [searchTerm, setSearchTerm] = useState("");
   const [selectedCols, setSelectedCols] = useState([]);
+  const [corrMethod, setCorrMethod] = useState("pearson");
+  const [handleOutliers, setHandleOutliers] = useState(false);
   const [corrData, setCorrData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
   const [hoveredCell, setHoveredCell] = useState(null);
+  const [lockedVariable, setLockedVariable] = useState(null);
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0];
@@ -53,6 +78,8 @@ export default function CorrelationPage() {
     setUploadMessage("Processing file...");
     setCorrData(null);
     setSelectedCols([]);
+    setSearchTerm("");
+    setLockedVariable(null);
 
     const formData = new FormData();
     formData.append("file", file);
@@ -123,6 +150,8 @@ export default function CorrelationPage() {
     setLoading(true);
     setError(null);
     setCorrData(null);
+    setLockedVariable(null);
+    setHoveredCell(null);
 
     try {
       const response = await fetch("/api/analysis/correlation", {
@@ -135,6 +164,8 @@ export default function CorrelationPage() {
           file_id: fileId,
           columns: selectedCols,
           file_name: fileName || "Unknown file",
+          method: corrMethod,
+          handle_outliers: handleOutliers,
         }),
       });
 
@@ -154,7 +185,28 @@ export default function CorrelationPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCols, fileId, fileName]);
+  }, [selectedCols, fileId, fileName, corrMethod, handleOutliers]);
+
+  const handleStatRowClick = (col) => {
+    if (lockedVariable === col) {
+      setLockedVariable(null);
+    } else {
+      setLockedVariable(col);
+      if (heatmapRef.current) {
+        heatmapRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }
+  };
+
+  const filteredCols = useMemo(() => {
+    if (!searchTerm) return numericCols;
+    return numericCols.filter((c) =>
+      c.toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+  }, [numericCols, searchTerm]);
 
   const hoveredInfo =
     hoveredCell && corrData
@@ -166,6 +218,8 @@ export default function CorrelationPage() {
         }
       : null;
 
+  const isCompactMatrix = corrData && corrData.tickers.length > 12;
+
   return (
     <div className={styles.pageContainer}>
       <div className={styles.pageHeader}>
@@ -173,7 +227,7 @@ export default function CorrelationPage() {
           <div>
             <h1 className={styles.pageTitle}>Correlation Analysis</h1>
             <p className={styles.pageDesc}>
-              Pearson correlation matrix · Significance levels · Descriptive
+              Pearson & Spearman matrices · Outlier Treatment · Descriptive
               statistics
             </p>
           </div>
@@ -200,7 +254,7 @@ export default function CorrelationPage() {
               type="file"
               accept=".csv,.xlsx,.xls"
               onChange={handleFileUpload}
-              style={{ display: "none" }}
+              className={styles.hiddenInput}
             />
 
             {uploadStatus === "loading" ? (
@@ -241,38 +295,83 @@ export default function CorrelationPage() {
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
               <span className={styles.sectionNum}>02</span>
-              <h2 className={styles.sectionTitle}>Select Variables</h2>
+              <h2 className={styles.sectionTitle}>Analysis Parameters</h2>
               <span className={styles.sectionHint}>
                 Selected: {selectedCols.length} / Max 30
               </span>
-              <div className={styles.actionBtnGroup}>
-                <button
-                  className={styles.actionBtn}
-                  onClick={() => setSelectedCols(numericCols.slice(0, 30))}
-                >
-                  Select All
-                </button>
-                <button
-                  className={styles.actionBtn}
-                  onClick={() => setSelectedCols([])}
-                >
-                  Clear
-                </button>
-              </div>
             </div>
 
-            <div className={styles.pillGrid}>
-              {numericCols.map((col) => (
-                <button
-                  key={col}
-                  className={`${styles.pill} ${
-                    selectedCols.includes(col) ? styles.pillActive : ""
-                  }`}
-                  onClick={() => toggleCol(col)}
+            <div className={styles.settingsRow}>
+              <div className={styles.settingsBlockFlex}>
+                <div className={styles.settingsSearchHeader}>
+                  <input
+                    type="text"
+                    placeholder="Search variables..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className={styles.searchInput}
+                  />
+                  <div className={styles.actionBtnGroup}>
+                    <button
+                      className={styles.pill}
+                      onClick={() => setSelectedCols(numericCols.slice(0, 30))}
+                    >
+                      Select All
+                    </button>
+                    <button
+                      className={styles.pill}
+                      onClick={() => setSelectedCols([])}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                </div>
+
+                <div className={styles.pillGridScrollable}>
+                  {filteredCols.map((col) => (
+                    <button
+                      key={col}
+                      className={`${styles.pill} ${
+                        selectedCols.includes(col) ? styles.pillActive : ""
+                      }`}
+                      onClick={() => toggleCol(col)}
+                    >
+                      {col}
+                    </button>
+                  ))}
+                  {filteredCols.length === 0 && (
+                    <span className={styles.emptySearch}>
+                      No variables found.
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className={styles.settingsBlock}>
+                <label className={styles.settingsLabel}>Method</label>
+                <select
+                  className={styles.customSelect}
+                  value={corrMethod}
+                  onChange={(e) => setCorrMethod(e.target.value)}
                 >
-                  {col}
-                </button>
-              ))}
+                  <option value="pearson">Pearson</option>
+                  <option value="spearman">Spearman</option>
+                </select>
+              </div>
+
+              <div className={styles.settingsBlock}>
+                <label className={styles.settingsLabel}>
+                  Outlier Treatment
+                </label>
+                <select
+                  className={styles.customSelect}
+                  value={handleOutliers ? "yes" : "no"}
+                  onChange={(e) => setHandleOutliers(e.target.value === "yes")}
+                >
+                  <option value="no">None</option>
+                  <option value="yes">Winsorize (1% - 99%)</option>
+                </select>
+              </div>
             </div>
 
             <button
@@ -296,48 +395,76 @@ export default function CorrelationPage() {
 
         {corrData && (
           <>
-            <div className={styles.section}>
+            <div className={styles.section} ref={heatmapRef}>
               <div className={styles.sectionHeader}>
                 <span className={styles.sectionNum}>03</span>
                 <h2 className={styles.sectionTitle}>Correlation Matrix</h2>
                 <span className={styles.sectionHint}>
                   n = {corrData.observations} observations
                 </span>
+                {lockedVariable && (
+                  <button
+                    className={styles.actionBtn}
+                    onClick={() => setLockedVariable(null)}
+                    style={{ marginLeft: "auto" }}
+                  >
+                    Clear Selection
+                  </button>
+                )}
               </div>
 
-              <div className={styles.heatmapWrapper}>
+              <div className={styles.scrollableMatrixContainer}>
                 <div
-                  className={styles.heatmap}
+                  className={styles.heatmapGrid}
                   style={{
-                    gridTemplateColumns: `max-content repeat(${corrData.tickers.length}, 1fr)`,
+                    gridTemplateColumns: `max-content repeat(${corrData.tickers.length}, minmax(${isCompactMatrix ? "35px" : "90px"}, 1fr))`,
                   }}
                 >
-                  <div className={styles.cornerCell} />
+                  <div className={styles.stickyCorner} />
+
                   {corrData.tickers.map((t) => (
-                    <div key={t} className={styles.headerCell}>
+                    <div
+                      key={t}
+                      className={`${styles.stickyHeaderTop} ${isCompactMatrix ? styles.verticalText : ""} ${lockedVariable === t ? styles.headerLocked : ""}`}
+                      title={t}
+                    >
                       {t}
                     </div>
                   ))}
+
                   {corrData.tickers.map((rowTicker, i) => (
                     <React.Fragment key={rowTicker}>
-                      <div className={styles.rowLabel}>{rowTicker}</div>
+                      <div
+                        className={`${styles.stickyHeaderLeft} ${lockedVariable === rowTicker ? styles.headerLocked : ""}`}
+                        title={rowTicker}
+                      >
+                        {rowTicker}
+                      </div>
+
                       {corrData.tickers.map((_, j) => {
                         const val = corrData.correlation_matrix[i][j];
                         const pval = corrData.pvalue_matrix[i][j];
+
+                        const isLocked =
+                          lockedVariable &&
+                          (corrData.tickers[i] === lockedVariable ||
+                            corrData.tickers[j] === lockedVariable);
                         const isHovered =
+                          !lockedVariable &&
                           hoveredCell &&
                           (hoveredCell.i === i || hoveredCell.j === j) &&
                           !(hoveredCell.i === i && hoveredCell.j === j);
                         const isActive =
+                          !lockedVariable &&
                           hoveredCell &&
                           hoveredCell.i === i &&
                           hoveredCell.j === j;
+                        const isDimmed = lockedVariable && !isLocked;
+
                         return (
                           <div
                             key={j}
-                            className={`${styles.cell} ${
-                              isHovered ? styles.cellDim : ""
-                            } ${isActive ? styles.cellActive : ""}`}
+                            className={`${styles.matrixCell} ${isHovered ? styles.matrixCellHovered : ""} ${isActive ? styles.matrixCellActive : ""} ${isLocked ? styles.matrixCellLocked : ""} ${isDimmed ? styles.matrixCellDimmed : ""}`}
                             style={{
                               backgroundColor: corrToColor(val),
                               color: textColor(val),
@@ -345,12 +472,16 @@ export default function CorrelationPage() {
                             onMouseEnter={() => setHoveredCell({ i, j })}
                             onMouseLeave={() => setHoveredCell(null)}
                           >
-                            <span className={styles.cellValue}>
-                              {val.toFixed(2)}
-                            </span>
-                            <span className={styles.cellSig}>
-                              {significanceLabel(pval)}
-                            </span>
+                            {!isCompactMatrix && (
+                              <span className={styles.cellValueText}>
+                                {val.toFixed(2)}
+                              </span>
+                            )}
+                            {!isCompactMatrix && significanceLabel(pval) && (
+                              <span className={styles.cellSigText}>
+                                {significanceLabel(pval)}
+                              </span>
+                            )}
                           </div>
                         );
                       })}
@@ -359,7 +490,7 @@ export default function CorrelationPage() {
                 </div>
               </div>
 
-              <div className={styles.infoBar}>
+              <div className={styles.infoBarMargin}>
                 {hoveredInfo && hoveredInfo.ti !== hoveredInfo.tj ? (
                   <span>
                     <strong>{hoveredInfo.ti}</strong> ↔{" "}
@@ -392,29 +523,48 @@ export default function CorrelationPage() {
               <div className={styles.sectionHeader}>
                 <span className={styles.sectionNum}>04</span>
                 <h2 className={styles.sectionTitle}>Descriptive Statistics</h2>
+                <span className={styles.sectionHint}>
+                  Click a row to highlight in matrix
+                </span>
               </div>
-              <div className={styles.statsGrid}>
-                {Object.entries(corrData.descriptive_stats).map(([col, s]) => (
-                  <div key={col} className={styles.statCard}>
-                    <div className={styles.statCardTitle}>{col}</div>
-                    <div className={styles.statRow}>
-                      <span>Mean</span>
-                      <span>{s.mean}</span>
-                    </div>
-                    <div className={styles.statRow}>
-                      <span>Std. dev.</span>
-                      <span>{s.std}</span>
-                    </div>
-                    <div className={styles.statRow}>
-                      <span>Min</span>
-                      <span>{s.min}</span>
-                    </div>
-                    <div className={styles.statRow}>
-                      <span>Max</span>
-                      <span>{s.max}</span>
-                    </div>
-                  </div>
-                ))}
+
+              <div className={styles.dataTableWrapper}>
+                <table className={styles.dataTable}>
+                  <thead>
+                    <tr>
+                      <th>Variable</th>
+                      <th>Mean</th>
+                      <th>Std. Dev</th>
+                      <th>Median</th>
+                      <th title="Shapiro-Wilk (p < 0.05 = not normal)">
+                        Normality (p)
+                      </th>
+                      <th>Min</th>
+                      <th>Max</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {Object.entries(corrData.descriptive_stats).map(
+                      ([col, s]) => (
+                        <tr
+                          key={col}
+                          className={`${styles.dataTableRow} ${lockedVariable === col ? styles.dataTableRowLocked : ""}`}
+                          onClick={() => handleStatRowClick(col)}
+                        >
+                          <td className={styles.varNameCell}>
+                            <div className={styles.varNameInner}>{col}</div>
+                          </td>
+                          <td>{formatStatValue(s.mean)}</td>
+                          <td>{formatStatValue(s.std)}</td>
+                          <td>{formatStatValue(s.median)}</td>
+                          <td>{s.shapiro_pvalue}</td>
+                          <td>{formatStatValue(s.min)}</td>
+                          <td>{formatStatValue(s.max)}</td>
+                        </tr>
+                      ),
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </>

@@ -13,7 +13,7 @@
   padding: 28px 40px;
   position: sticky;
   top: 0;
-  z-index: 50;
+  z-index: 100;
   box-shadow: 0 4px 10px rgba(0, 0, 0, 0.3);
 }
 
@@ -221,13 +221,6 @@
   font-size: 0.85rem;
 }
 
-.pillGrid {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 20px;
-}
-
 .pill {
   padding: 7px 16px;
   border: 1px solid #dee2e6;
@@ -293,101 +286,229 @@
   animation: spin 0.7s linear infinite;
 }
 
-.heatmapWrapper {
-  overflow-x: auto;
-  max-width: 100%;
+.settingsRow {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.settingsBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.settingsLabel {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #495057;
+}
+
+.hiddenInput {
+  display: none;
+}
+
+.settingsBlockFlex {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.settingsSearchHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.searchInput {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.pillGridScrollable {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.emptySearch {
+  color: #888;
+  font-size: 14px;
+}
+
+.customSelect {
+  appearance: none;
+  padding: 10px 36px 10px 14px;
+  border: 1px solid #dee2e6;
+  border-radius: 6px;
+  background-color: #f8f9fa;
+  background-image: url("data:image/svg+xml;charset=US-ASCII,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20width%3D%22292.4%22%20height%3D%22292.4%22%3E%3Cpath%20fill%3D%22%23495057%22%20d%3D%22M287%2069.4a17.6%2017.6%200%200%200-13-5.4H18.4c-5%200-9.3%201.8-12.9%205.4A17.6%2017.6%200%200%200%200%2082.2c0%205%201.8%209.3%205.4%2012.9l128%20127.9c3.6%203.6%207.8%205.4%2012.8%205.4s9.2-1.8%2012.8-5.4L287%2095c3.5-3.5%205.4-7.8%205.4-12.8%200-5-1.9-9.2-5.5-12.8z%22%2F%3E%3C%2Fsvg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px top 50%;
+  background-size: 10px auto;
+  font-size: 0.85rem;
+  font-family: inherit;
+  color: #495057;
+  cursor: pointer;
+  width: 100%;
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s,
+    background-color 0.2s;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
+}
+
+.customSelect:focus {
+  outline: none;
+  border-color: #d90429;
+  box-shadow: 0 0 0 3px rgba(217, 4, 41, 0.1);
+  background-color: #fff;
+}
+
+.customSelect:hover {
+  border-color: #d90429;
+}
+
+.scrollableMatrixContainer {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: auto;
+  max-height: 650px;
+  border: 1px solid #eee;
+  border-radius: 8px;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.02);
+  position: relative;
+  isolation: isolate;
+}
+
+.heatmapGrid {
+  display: grid;
+  width: max-content;
   position: relative;
 }
 
-.heatmap {
-  display: grid;
-  gap: 2px;
-  min-width: fit-content;
+.stickyCorner {
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 30;
+  background: #fff;
+  border-bottom: 1px solid #ddd;
+  border-right: 1px solid #ddd;
 }
 
-.cornerCell {
+.stickyHeaderTop {
   position: sticky;
-  left: 0;
   top: 0;
   z-index: 20;
-  background-color: #fff;
-}
-
-.headerCell {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background-color: #fff;
-  text-align: center;
-  font-size: 0.75rem;
-  font-weight: 700;
+  background: #fafafa;
+  border-bottom: 1px solid #ddd;
   padding: 8px 4px;
-  color: #495057;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #555;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
-.rowLabel {
+.verticalText {
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  text-align: left;
+  transform: rotate(180deg);
+  will-change: transform;
+}
+
+.stickyHeaderLeft {
   position: sticky;
   left: 0;
   z-index: 10;
-  background-color: #fff;
+  background: #fafafa;
+  border-right: 1px solid #ddd;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #333;
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding-right: 12px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: #495057;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 
-.cell {
+.matrixCell {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-width: 68px;
-  min-height: 58px;
-  border-radius: 3px;
-  cursor: default;
-  transition:
-    transform 0.1s,
-    box-shadow 0.1s;
-  user-select: none;
+  position: relative;
+  cursor: crosshair;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-sizing: border-box;
+  transition: opacity 0.15s ease;
+  min-width: 0;
+  z-index: 1;
 }
 
-.cell:hover {
-  transform: scale(1.07);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.18);
+.matrixCellHovered {
+  opacity: 0.4;
   z-index: 2;
 }
 
-.cellDim {
-  opacity: 0.55;
+.matrixCellActive {
+  box-shadow: inset 0 0 0 2px #000 !important;
+  z-index: 6 !important;
 }
 
-.cellActive {
-  transform: scale(1.1) !important;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25) !important;
-  z-index: 3;
+.matrixCellLocked {
+  box-shadow:
+    inset 0 0 0 2px #d90429,
+    0 0 8px rgba(217, 4, 41, 0.5) !important;
+  z-index: 7 !important;
+  opacity: 1 !important;
 }
 
-.cellValue {
-  font-size: 0.82rem;
-  font-weight: 700;
-  line-height: 1;
+.matrixCellDimmed {
+  opacity: 0.15;
+  z-index: 1;
 }
 
-.cellSig {
-  font-size: 0.65rem;
-  line-height: 1.4;
-  opacity: 0.85;
+.headerLocked {
+  color: #d90429 !important;
+  background-color: #fff0f0 !important;
 }
 
-.infoBar {
+.cellValueText {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.cellSigText {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.infoBarMargin {
   padding: 8px 12px;
   background: #f8f9fa;
   border-left: 3px solid #d90429;
@@ -395,6 +516,7 @@
   font-size: 0.85rem;
   color: #333;
   margin-bottom: 14px;
+  margin-top: 16px;
   min-height: 36px;
   display: flex;
   align-items: center;
@@ -427,42 +549,93 @@
   font-size: 0.75rem;
 }
 
-.statsGrid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 14px;
-}
-
-.statCard {
-  background: #f8f9fa;
+.dataTableWrapper {
+  overflow-x: auto;
+  background: #fff;
   border: 1px solid #dee2e6;
-  border-top: 3px solid #d90429;
-  border-radius: 4px;
-  padding: 14px 16px;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
 }
 
-.statCardTitle {
+.dataTable {
+  width: 100%;
+  text-align: left;
+  border-collapse: collapse;
   font-size: 0.85rem;
+}
+
+.dataTable thead tr {
+  background: #f8f9fa;
+  border-bottom: 2px solid #dee2e6;
+}
+
+.dataTable th {
+  padding: 14px 16px;
+  color: #495057;
   font-weight: 700;
-  color: #121212;
   text-transform: uppercase;
-  letter-spacing: 0.3px;
-  margin-bottom: 10px;
-  padding-bottom: 6px;
-  border-bottom: 1px solid #dee2e6;
-  white-space: normal;
-  word-break: break-word;
+  letter-spacing: 0.5px;
+  font-size: 0.75rem;
+  white-space: nowrap;
 }
 
-.statRow {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.8rem;
-  color: #868e96;
-  padding: 3px 0;
+.dataTable tbody tr {
+  border-bottom: 1px solid #f1f3f5;
 }
 
-.statRow span:last-child {
+.dataTableRow {
+  transition:
+    background-color 0.2s ease,
+    transform 0.1s ease;
+  cursor: pointer;
+}
+
+.dataTableRow:hover {
+  background-color: #fff5f5;
+}
+
+.dataTableRowLocked {
+  background-color: #fff0f0 !important;
+}
+
+.dataTableRowLocked td {
+  color: #d90429 !important;
   font-weight: 600;
-  color: #333;
+}
+
+.dataTable td {
+  padding: 12px 16px;
+  color: #495057;
+  vertical-align: middle;
+}
+
+.varNameCell {
+  font-weight: 600;
+  color: #121212 !important;
+  position: relative;
+}
+
+.varNameInner {
+  display: flex;
+  align-items: center;
+}
+
+.dataTableRow:hover .varNameInner::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: #d90429;
+}
+
+.dataTableRowLocked .varNameInner::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: #d90429;
 }

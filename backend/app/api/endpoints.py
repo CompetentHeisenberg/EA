@@ -213,8 +213,11 @@ async def get_correlation(
 
         df_selected = df[request.columns].dropna()
         
+        if request.handle_outliers:
+            df_selected = preprocessor.clean_and_validate(df_selected, handle_outliers=True)
+
         data_dict = {col: df_selected[col].tolist() for col in request.columns}
-        result = compute_correlation_matrix(data_dict)
+        result = compute_correlation_matrix(data_dict, method=request.method)
 
         session = AnalysisSession(
             user_id=current_user.id,
@@ -223,7 +226,7 @@ async def get_correlation(
             file_cols=len(result["tickers"]),
             analysis_type="correlation",
             columns_used=result["tickers"],
-            parameters={}
+            parameters={"method": request.method, "handle_outliers": request.handle_outliers}
         )
         db.add(session)
         await db.flush()
@@ -263,13 +266,15 @@ async def get_pca(
         df_for_math = df_selected[request.columns]
         df_scaled = preprocessor.scale_data(df_for_math)
         
-        clusters, pca_df, variance = stats_engine.run_full_analysis(df_scaled, request.n_clusters)
+        clusters, pca_df, variance, loadings, cluster_metrics = stats_engine.run_full_analysis(df_scaled, request.n_clusters)
 
         result = {
-            "clusters": clusters.tolist(),
+            "clusters": clusters,
             "pca_data": pca_df.to_dict(orient="records"),
-            "variance": variance.tolist(),
-            "original_data": df_selected.to_dict(orient="records")
+            "variance": variance,
+            "original_data": df_selected.to_dict(orient="records"),
+            "loadings": loadings,
+            "cluster_metrics": cluster_metrics
         }
 
         session = AnalysisSession(
