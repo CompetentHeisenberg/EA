@@ -213,17 +213,7 @@ export default function HistoryPage() {
               <span>Loading history...</span>
             </div>
           ) : history.length === 0 ? (
-            <div className={styles.emptyState}>
-              No analyses yet. Go to{" "}
-              <a href="/correlation" className={styles.emptyLink}>
-                correlation analysis
-              </a>{" "}
-              or{" "}
-              <a href="/pca" className={styles.emptyLink}>
-                PCA
-              </a>
-              .
-            </div>
+            <div className={styles.emptyState}>No analyses yet.</div>
           ) : (
             <div className={styles.historyList}>
               {history.map((item, i) => {
@@ -314,7 +304,7 @@ export default function HistoryPage() {
                               href={`/history/${item.id}`}
                               className={styles.detailLink}
                             >
-                              View details →
+                              View detailed interactive report →
                             </a>
                           </>
                         ) : (

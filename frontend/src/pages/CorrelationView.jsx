@@ -1,4 +1,10 @@
-import React, { useState, useCallback, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useRef,
+  useEffect,
+} from "react";
 import styles from "../css/correlation.module.css";
 
 function corrToColor(value) {
@@ -47,14 +53,8 @@ function significanceLabel(pval) {
   return "";
 }
 
-export default function CorrelationPage() {
+export default function CorrelationView({ fileId, numericCols, fileName }) {
   const heatmapRef = useRef(null);
-
-  const [fileId, setFileId] = useState(null);
-  const [numericCols, setNumericCols] = useState([]);
-  const [fileName, setFileName] = useState("");
-  const [uploadStatus, setUploadStatus] = useState(null);
-  const [uploadMessage, setUploadMessage] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCols, setSelectedCols] = useState([]);
@@ -67,63 +67,11 @@ export default function CorrelationPage() {
   const [hoveredCell, setHoveredCell] = useState(null);
   const [lockedVariable, setLockedVariable] = useState(null);
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const token = localStorage.getItem("token");
-
-    setFileName(file.name);
-    setUploadStatus("loading");
-    setUploadMessage("Processing file...");
-    setCorrData(null);
-    setSelectedCols([]);
-    setSearchTerm("");
-    setLockedVariable(null);
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      if (response.status === 401) {
-        throw new Error("Authorization error. Please log in again.");
-      }
-
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || "Upload Error");
-      }
-
-      const result = await response.json();
-      setFileId(result.file_id);
-
-      const numCols = result.numeric_columns || [];
-      setNumericCols(numCols);
-      setSelectedCols(numCols.slice(0, 5));
-
-      setUploadStatus("success");
-      setUploadMessage(
-        `${result.total_rows} rows · ${result.columns.length} columns`,
-      );
-    } catch (err) {
-      setUploadStatus("error");
-      setUploadMessage(err.message);
+  useEffect(() => {
+    if (numericCols && numericCols.length > 0) {
+      setSelectedCols(numericCols.slice(0, 5));
     }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileUpload({ target: { files: [file] } });
-  };
+  }, [numericCols]);
 
   const toggleCol = (col) => {
     setSelectedCols((prev) =>
@@ -222,79 +170,11 @@ export default function CorrelationPage() {
 
   return (
     <div className={styles.pageContainer}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeaderInner}>
-          <div>
-            <h1 className={styles.pageTitle}>Correlation Analysis</h1>
-            <p className={styles.pageDesc}>
-              Pearson & Spearman matrices · Outlier Treatment · Descriptive
-              statistics
-            </p>
-          </div>
-        </div>
-      </div>
-
       <div className={styles.pageBody}>
-        <div className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionNum}>01</span>
-            <h2 className={styles.sectionTitle}>Data Loading</h2>
-          </div>
-
-          <div
-            className={`${styles.dropZone} ${
-              uploadStatus === "success" ? styles.dropZoneSuccess : ""
-            } ${uploadStatus === "error" ? styles.dropZoneError : ""}`}
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={() => document.getElementById("corrFileInput").click()}
-          >
-            <input
-              id="corrFileInput"
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              onChange={handleFileUpload}
-              className={styles.hiddenInput}
-            />
-
-            {uploadStatus === "loading" ? (
-              <div className={styles.uploadState}>
-                <div className={styles.spinner} />
-                <span>Processing File...</span>
-              </div>
-            ) : uploadStatus === "success" ? (
-              <div className={styles.uploadState}>
-                <div className={styles.successIcon}>✓</div>
-                <div className={styles.uploadInfo}>
-                  <span className={styles.uploadFileName}>{fileName}</span>
-                  <span className={styles.uploadMeta}>{uploadMessage}</span>
-                </div>
-                <span className={styles.replaceHint}>Click to change</span>
-              </div>
-            ) : (
-              <div className={styles.uploadState}>
-                <div className={styles.uploadArrow}>↑</div>
-                <div className={styles.uploadInfo}>
-                  <span className={styles.uploadCta}>
-                    Drag and drop file or click to select
-                  </span>
-                  <span className={styles.uploadMeta}>
-                    Support CSV, XLSX, XLS
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {uploadStatus === "error" && (
-            <div className={styles.errorBanner}>{uploadMessage}</div>
-          )}
-        </div>
-
         {numericCols.length > 0 && (
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
-              <span className={styles.sectionNum}>02</span>
+              <span className={styles.sectionNum}>01</span>
               <h2 className={styles.sectionTitle}>Analysis Parameters</h2>
               <span className={styles.sectionHint}>
                 Selected: {selectedCols.length} / Max 30
@@ -397,7 +277,7 @@ export default function CorrelationPage() {
           <>
             <div className={styles.section} ref={heatmapRef}>
               <div className={styles.sectionHeader}>
-                <span className={styles.sectionNum}>03</span>
+                <span className={styles.sectionNum}>02</span>
                 <h2 className={styles.sectionTitle}>Correlation Matrix</h2>
                 <span className={styles.sectionHint}>
                   n = {corrData.observations} observations
@@ -521,7 +401,7 @@ export default function CorrelationPage() {
 
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
-                <span className={styles.sectionNum}>04</span>
+                <span className={styles.sectionNum}>03</span>
                 <h2 className={styles.sectionTitle}>Descriptive Statistics</h2>
                 <span className={styles.sectionHint}>
                   Click a row to highlight in matrix

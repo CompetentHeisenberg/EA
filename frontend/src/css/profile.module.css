@@ -200,7 +200,7 @@
 
 .clusterBtn:hover {
   border-color: #d90429;
-  color: #d90429;
+  color: #ffffff;
 }
 .clusterBtnActive {
   background: #d90429;
@@ -883,5 +883,6 @@
   transition: background 0.2s;
 }
 .detailLink:hover {
+  color: #ffffff;
   background: #d90429;
 }

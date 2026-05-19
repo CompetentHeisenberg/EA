@@ -5,9 +5,8 @@ import Registration from "./pages/Registration";
 import ProfilePage from "./pages/ProfilePage";
 import HistoryDetailPage from "./pages/HistoryDetailPage";
 import HistoryPage from "./pages/HistoryPage";
-import CorrelationPage from "./pages/CorrelationPage";
-import PCAPage from "./pages/PCAPage";
 import MarketsPage from "./pages/MarketsPage";
+import Workspace from "./pages/Workspace";
 
 const PrivateRoute = ({ children }) => {
   return localStorage.getItem("token") ? (
@@ -29,14 +28,6 @@ function App() {
           element={
             <PrivateRoute>
               <Main />
-            </PrivateRoute>
-          }
-        />
-        <Route
-          path="/pca"
-          element={
-            <PrivateRoute>
-              <PCAPage />
             </PrivateRoute>
           }
         />
@@ -65,18 +56,18 @@ function App() {
           }
         />
         <Route
-          path="/correlation"
-          element={
-            <PrivateRoute>
-              <CorrelationPage />
-            </PrivateRoute>
-          }
-        />
-        <Route
           path="/markets"
           element={
             <PrivateRoute>
               <MarketsPage />
+            </PrivateRoute>
+          }
+        />
+        <Route
+          path="/workspace"
+          element={
+            <PrivateRoute>
+              <Workspace />
             </PrivateRoute>
           }
         />

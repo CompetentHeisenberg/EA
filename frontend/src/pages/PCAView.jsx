@@ -23,18 +23,11 @@ const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 500;
 const PAD = 60;
 
-export default function PCAPage() {
+export default function PCAView({ fileId, columns, numericCols }) {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
   const hoverThrottle = useRef(false);
   const hasDragged = useRef(false);
-
-  const [fileId, setFileId] = useState(null);
-  const [columns, setColumns] = useState([]);
-  const [numericCols, setNumericCols] = useState([]);
-  const [fileName, setFileName] = useState("");
-  const [uploadStatus, setUploadStatus] = useState(null);
-  const [uploadMessage, setUploadMessage] = useState("");
 
   const [labelCol, setLabelCol] = useState("");
   const [selectedCols, setSelectedCols] = useState([]);
@@ -55,61 +48,13 @@ export default function PCAPage() {
   const [page, setPage] = useState(0);
   const rowsPerPage = 50;
 
-  const handleFileUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    const token = localStorage.getItem("token");
-    setFileName(file.name);
-    setUploadStatus("loading");
-    setResult(null);
-    setSelectedCols([]);
-    setLabelCol("");
-    setPage(0);
-
-    const formData = new FormData();
-    formData.append("file", file);
-
-    try {
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData,
-      });
-
-      if (response.status === 401) throw new Error("Authorization expired.");
-      if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err.detail || "Upload error");
-      }
-
-      const res = await response.json();
-
-      setFileId(res.file_id);
-      setColumns(res.columns);
-
-      const numCols = res.numeric_columns || [];
-      setNumericCols(numCols);
-
-      const textCols = res.columns.filter((col) => !numCols.includes(col));
+  useEffect(() => {
+    if (numericCols && numericCols.length > 0) {
+      setSelectedCols(numericCols.slice(0, 8));
+      const textCols = columns.filter((col) => !numericCols.includes(col));
       if (textCols.length > 0) setLabelCol(textCols[0]);
-
-      setSelectedCols(numCols.slice(0, 8));
-      setUploadStatus("success");
-      setUploadMessage(
-        `Loaded rows: ${res.total_rows} · Columns: ${res.columns.length}`,
-      );
-    } catch (err) {
-      setUploadStatus("error");
-      setUploadMessage(err.message);
     }
-  };
-
-  const handleDrop = (e) => {
-    e.preventDefault();
-    const file = e.dataTransfer.files[0];
-    if (file) handleFileUpload({ target: { files: [file] } });
-  };
+  }, [columns, numericCols]);
 
   const toggleCol = (col) => {
     setSelectedCols((prev) =>
@@ -425,71 +370,11 @@ export default function PCAPage() {
 
   return (
     <div className={styles.pageContainer}>
-      <div className={styles.pageHeader}>
-        <div className={styles.pageHeaderInner}>
-          <div>
-            <h1 className={styles.pageTitle}>PCA & Cluster Analysis</h1>
-            <p className={styles.pageDesc}>
-              Principal Component Analysis · K-Means Clustering · Dimensionality
-              Reduction
-            </p>
-          </div>
-        </div>
-      </div>
-
       <div className={styles.pageBody}>
-        <div className={styles.section}>
-          <div className={styles.sectionHeader}>
-            <span className={styles.sectionNum}>01</span>
-            <h2 className={styles.sectionTitle}>Data Loading</h2>
-          </div>
-          <div
-            className={`${styles.dropZone} ${
-              uploadStatus === "success" ? styles.dropZoneSuccess : ""
-            } ${uploadStatus === "error" ? styles.dropZoneError : ""}`}
-            onDrop={handleDrop}
-            onDragOver={(e) => e.preventDefault()}
-            onClick={() => document.getElementById("pcaFileInput").click()}
-          >
-            <input
-              id="pcaFileInput"
-              type="file"
-              accept=".csv,.xlsx,.xls"
-              onChange={handleFileUpload}
-              style={{ display: "none" }}
-            />
-            {uploadStatus === "loading" ? (
-              <div className={styles.uploadState}>
-                <div className={styles.spinner} />
-                <span>Processing file...</span>
-              </div>
-            ) : uploadStatus === "success" ? (
-              <div className={styles.uploadState}>
-                <div className={styles.successIcon}>✓</div>
-                <div className={styles.uploadInfo}>
-                  <span className={styles.uploadFileName}>{fileName}</span>
-                  <span className={styles.uploadMeta}>{uploadMessage}</span>
-                </div>
-                <span className={styles.replaceHint}>Click to replace</span>
-              </div>
-            ) : (
-              <div className={styles.uploadState}>
-                <div className={styles.uploadArrow}>↑</div>
-                <div className={styles.uploadInfo}>
-                  <span className={styles.uploadCta}>
-                    Drag file or click to select
-                  </span>
-                  <span className={styles.uploadMeta}>CSV, XLSX, XLS</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
         {numericCols.length > 0 && (
           <div className={styles.section}>
             <div className={styles.sectionHeader}>
-              <span className={styles.sectionNum}>02</span>
+              <span className={styles.sectionNum}>01</span>
               <h2 className={styles.sectionTitle}>Analysis Parameters</h2>
               <span className={styles.sectionHint}>
                 Selected: {selectedCols.length}
@@ -589,7 +474,7 @@ export default function PCAPage() {
           <>
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
-                <span className={styles.sectionNum}>03</span>
+                <span className={styles.sectionNum}>02</span>
                 <h2 className={styles.sectionTitle}>Explained Variance</h2>
                 <span className={styles.sectionHint}>
                   Total:{" "}
@@ -619,7 +504,7 @@ export default function PCAPage() {
 
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
-                <span className={styles.sectionNum}>04</span>
+                <span className={styles.sectionNum}>03</span>
                 <h2 className={styles.sectionTitle}>Projection Plot</h2>
                 <div className={styles.axisSelectors}>
                   <select
@@ -908,7 +793,7 @@ export default function PCAPage() {
 
             <div className={styles.section}>
               <div className={styles.sectionHeader}>
-                <span className={styles.sectionNum}>05</span>
+                <span className={styles.sectionNum}>04</span>
                 <h2 className={styles.sectionTitle}>Results Table</h2>
               </div>
               <div className={styles.tableWrapper}>

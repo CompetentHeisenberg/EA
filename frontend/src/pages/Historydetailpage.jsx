@@ -1,6 +1,14 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+} from "react";
+import { quadtree } from "d3-quadtree";
 import { fetchHistoryResult } from "../services/api";
 import styles from "../css/history.module.css";
+import corrStyles from "../css/correlation.module.css";
 
 const CLUSTER_COLORS = [
   "#d90429",
@@ -18,16 +26,24 @@ const ANALYSIS_LABELS = {
   pca: "PCA and Clustering",
 };
 
+const CANVAS_WIDTH = 800;
+const CANVAS_HEIGHT = 500;
+const PAD = 60;
+
 function corrToColor(v) {
+  if (v === null || v === undefined) return "#e5e5e5";
   const val = Math.max(-1, Math.min(1, v));
-  if (val >= 0)
+  if (val >= 0) {
     return `rgb(${Math.round(220 + (255 - 220) * val)},${Math.round(220 - 220 * val)},${Math.round(220 - 220 * val)})`;
+  }
   const a = Math.abs(val);
   return `rgb(${Math.round(220 - 220 * a)},${Math.round(220 - 220 * a)},${Math.round(220 + (255 - 220) * a)})`;
 }
+
 function textColor(v) {
   return Math.abs(v) > 0.6 ? "#fff" : "#222";
 }
+
 function sigLabel(p) {
   if (p < 0.01) return "***";
   if (p < 0.05) return "**";
@@ -35,16 +51,50 @@ function sigLabel(p) {
   return "";
 }
 
+function formatStatValue(val) {
+  if (val === null || val === undefined || isNaN(val)) return "N/A";
+  const absVal = Math.abs(val);
+  if (absVal >= 1e6) {
+    return new Intl.NumberFormat("en-US", {
+      notation: "compact",
+      compactDisplay: "short",
+      maximumFractionDigits: 2,
+    }).format(val);
+  }
+  return new Intl.NumberFormat("en-US", { maximumFractionDigits: 4 }).format(
+    val,
+  );
+}
+
 function CorrelationDetail({ result }) {
-  const [hovered, setHovered] = useState(null);
-  const info = hovered
+  const [hoveredCell, setHoveredCell] = useState(null);
+  const [lockedVariable, setLockedVariable] = useState(null);
+  const heatmapRef = useRef(null);
+
+  const hoveredInfo = hoveredCell
     ? {
-        ti: result.tickers[hovered.i],
-        tj: result.tickers[hovered.j],
-        corr: result.correlation_matrix[hovered.i][hovered.j],
-        pval: result.pvalue_matrix[hovered.i][hovered.j],
+        ti: result.tickers[hoveredCell.i],
+        tj: result.tickers[hoveredCell.j],
+        corr: result.correlation_matrix[hoveredCell.i][hoveredCell.j],
+        pval: result.pvalue_matrix[hoveredCell.i][hoveredCell.j],
       }
     : null;
+
+  const handleStatRowClick = (col) => {
+    if (lockedVariable === col) {
+      setLockedVariable(null);
+    } else {
+      setLockedVariable(col);
+      if (heatmapRef.current) {
+        heatmapRef.current.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }
+  };
+
+  const isCompactMatrix = result.tickers.length > 12;
 
   return (
     <>
@@ -61,9 +111,11 @@ function CorrelationDetail({ result }) {
           <span className={styles.kpiVal}>
             {(() => {
               let c = 0;
-              for (let i = 0; i < result.tickers.length; i++)
-                for (let j = i + 1; j < result.tickers.length; j++)
+              for (let i = 0; i < result.tickers.length; i++) {
+                for (let j = i + 1; j < result.tickers.length; j++) {
                   if (Math.abs(result.correlation_matrix[i][j]) > 0.7) c++;
+                }
+              }
               return c;
             })()}
           </span>
@@ -73,44 +125,90 @@ function CorrelationDetail({ result }) {
         </div>
       </div>
 
-      <div className={styles.section}>
+      <div className={styles.section} ref={heatmapRef}>
         <div className={styles.sectionHeader}>
           <span className={styles.sectionNum}>A</span>
           <h2 className={styles.sectionTitle}>Correlation Matrix</h2>
+          {lockedVariable && (
+            <button
+              className={styles.actionBtn}
+              onClick={() => setLockedVariable(null)}
+              style={{ marginLeft: "auto" }}
+            >
+              Clear Selection
+            </button>
+          )}
         </div>
-        <div className={styles.heatmapWrapper}>
+
+        <div className={corrStyles.scrollableMatrixContainer}>
           <div
-            className={styles.heatmap}
+            className={corrStyles.heatmapGrid}
             style={{
-              gridTemplateColumns: `max-content repeat(${result.tickers.length}, 1fr)`,
+              gridTemplateColumns: `max-content repeat(${result.tickers.length}, minmax(${isCompactMatrix ? "35px" : "90px"}, 1fr))`,
             }}
           >
-            <div />
+            <div className={corrStyles.stickyCorner} />
+
             {result.tickers.map((t) => (
-              <div key={t} className={styles.headerCell}>
+              <div
+                key={t}
+                className={`${corrStyles.stickyHeaderTop} ${isCompactMatrix ? corrStyles.verticalText : ""} ${lockedVariable === t ? corrStyles.headerLocked : ""}`}
+                title={t}
+              >
                 {t}
               </div>
             ))}
-            {result.tickers.map((rowT, i) => (
-              <React.Fragment key={rowT}>
-                <div className={styles.rowLabel}>{rowT}</div>
+
+            {result.tickers.map((rowTicker, i) => (
+              <React.Fragment key={rowTicker}>
+                <div
+                  className={`${corrStyles.stickyHeaderLeft} ${lockedVariable === rowTicker ? corrStyles.headerLocked : ""}`}
+                  title={rowTicker}
+                >
+                  {rowTicker}
+                </div>
+
                 {result.tickers.map((_, j) => {
                   const val = result.correlation_matrix[i][j];
                   const pval = result.pvalue_matrix[i][j];
-                  const isActive = hovered?.i === i && hovered?.j === j;
+
+                  const isLocked =
+                    lockedVariable &&
+                    (result.tickers[i] === lockedVariable ||
+                      result.tickers[j] === lockedVariable);
+                  const isHovered =
+                    !lockedVariable &&
+                    hoveredCell &&
+                    (hoveredCell.i === i || hoveredCell.j === j) &&
+                    !(hoveredCell.i === i && hoveredCell.j === j);
+                  const isActive =
+                    !lockedVariable &&
+                    hoveredCell &&
+                    hoveredCell.i === i &&
+                    hoveredCell.j === j;
+                  const isDimmed = lockedVariable && !isLocked;
+
                   return (
                     <div
                       key={j}
-                      className={`${styles.cell} ${isActive ? styles.cellActive : ""}`}
+                      className={`${corrStyles.matrixCell} ${isHovered ? corrStyles.matrixCellHovered : ""} ${isActive ? corrStyles.matrixCellActive : ""} ${isLocked ? corrStyles.matrixCellLocked : ""} ${isDimmed ? corrStyles.matrixCellDimmed : ""}`}
                       style={{
                         backgroundColor: corrToColor(val),
                         color: textColor(val),
                       }}
-                      onMouseEnter={() => setHovered({ i, j })}
-                      onMouseLeave={() => setHovered(null)}
+                      onMouseEnter={() => setHoveredCell({ i, j })}
+                      onMouseLeave={() => setHoveredCell(null)}
                     >
-                      <span className={styles.cellValue}>{val.toFixed(2)}</span>
-                      <span className={styles.cellSig}>{sigLabel(pval)}</span>
+                      {!isCompactMatrix && (
+                        <span className={corrStyles.cellValueText}>
+                          {val.toFixed(2)}
+                        </span>
+                      )}
+                      {!isCompactMatrix && sigLabel(pval) && (
+                        <span className={corrStyles.cellSigText}>
+                          {sigLabel(pval)}
+                        </span>
+                      )}
                     </div>
                   );
                 })}
@@ -118,19 +216,24 @@ function CorrelationDetail({ result }) {
             ))}
           </div>
         </div>
+
         <div className={styles.infoBar}>
-          {info && info.ti !== info.tj ? (
+          {hoveredInfo && hoveredInfo.ti !== hoveredInfo.tj ? (
             <span>
-              <strong>{info.ti}</strong> ↔ <strong>{info.tj}</strong>: r ={" "}
-              <strong>{info.corr.toFixed(4)}</strong> · p ={" "}
-              {info.pval.toFixed(4)} {sigLabel(info.pval)}
+              <strong>{hoveredInfo.ti}</strong> ↔{" "}
+              <strong>{hoveredInfo.tj}</strong>: &nbsp;r ={" "}
+              <strong>{hoveredInfo.corr.toFixed(4)}</strong>
+              &nbsp;· p = {hoveredInfo.pval.toFixed(4)}{" "}
+              {sigLabel(hoveredInfo.pval)}
             </span>
           ) : (
             <span>
-              Hover over a cell · *** p&lt;0.01 ** p&lt;0.05 * p&lt;0.1
+              Hover over cell for details &nbsp;·&nbsp; *** p&lt;0.01 &nbsp;**
+              p&lt;0.05 &nbsp;* p&lt;0.1
             </span>
           )}
         </div>
+
         <div className={styles.legend}>
           <span>-1</span>
           <div className={styles.legendBar} />
@@ -147,29 +250,55 @@ function CorrelationDetail({ result }) {
         <div className={styles.sectionHeader}>
           <span className={styles.sectionNum}>B</span>
           <h2 className={styles.sectionTitle}>Descriptive Statistics</h2>
+          <span className={styles.sectionHint}>
+            Click a row to highlight in matrix
+          </span>
         </div>
-        <div className={styles.statsGrid}>
-          {Object.entries(result.descriptive_stats).map(([col, s]) => (
-            <div key={col} className={styles.statCard}>
-              <div className={styles.statCardTitle}>{col}</div>
-              <div className={styles.statRow}>
-                <span>Mean</span>
-                <span>{s.mean}</span>
-              </div>
-              <div className={styles.statRow}>
-                <span>Std. dev.</span>
-                <span>{s.std}</span>
-              </div>
-              <div className={styles.statRow}>
-                <span>Min</span>
-                <span>{s.min}</span>
-              </div>
-              <div className={styles.statRow}>
-                <span>Max</span>
-                <span>{s.max}</span>
-              </div>
-            </div>
-          ))}
+        <div className={styles.tableWrapper}>
+          <table className={styles.table}>
+            <thead>
+              <tr>
+                <th>Variable</th>
+                <th>Mean</th>
+                <th>Std. Dev</th>
+                <th>Median</th>
+                <th title="Shapiro-Wilk (p < 0.05 = not normal)">
+                  Normality (p)
+                </th>
+                <th>Min</th>
+                <th>Max</th>
+              </tr>
+            </thead>
+            <tbody>
+              {Object.entries(result.descriptive_stats).map(([col, s]) => (
+                <tr
+                  key={col}
+                  className={`${styles.tableRowClickable} ${lockedVariable === col ? styles.rowHighlight : ""}`}
+                  onClick={() => handleStatRowClick(col)}
+                >
+                  <td>
+                    <div
+                      className={
+                        lockedVariable === col ? styles.varNameLocked : ""
+                      }
+                    >
+                      {col}
+                    </div>
+                  </td>
+                  <td>{formatStatValue(s.mean)}</td>
+                  <td>{formatStatValue(s.std)}</td>
+                  <td>{formatStatValue(s.median)}</td>
+                  <td>
+                    {s.shapiro_pvalue !== undefined
+                      ? formatStatValue(s.shapiro_pvalue)
+                      : "N/A"}
+                  </td>
+                  <td>{formatStatValue(s.min)}</td>
+                  <td>{formatStatValue(s.max)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </>
@@ -178,118 +307,269 @@ function CorrelationDetail({ result }) {
 
 function PCADetail({ result }) {
   const canvasRef = useRef(null);
-  const [hovered, setHovered] = useState(null);
+  const wrapperRef = useRef(null);
+  const hoverThrottle = useRef(false);
+  const hasDragged = useRef(false);
+
   const [axisX, setAxisX] = useState("PC1");
   const [axisY, setAxisY] = useState("PC2");
+  const [hoveredPoint, setHoveredPoint] = useState(null);
+  const [lockedPoint, setLockedPoint] = useState(null);
+  const [zoom, setZoom] = useState({ scale: 1, offsetX: 0, offsetY: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+
+  const [page, setPage] = useState(0);
+  const rowsPerPage = 50;
+
   const pcaKeys = result?.pca_data?.length
     ? Object.keys(result.pca_data[0])
     : [];
   const nClusters = Math.max(...result.clusters) + 1;
 
-  useEffect(() => {
-    if (!result || !canvasRef.current) return;
-    const canvas = canvasRef.current;
-    const ctx = canvas.getContext("2d");
-    const W = canvas.width,
-      H = canvas.height,
-      PAD = 54;
+  const handleAxisXChange = (e) => {
+    setAxisX(e.target.value);
+    setZoom({ scale: 1, offsetX: 0, offsetY: 0 });
+    setHoveredPoint(null);
+    setLockedPoint(null);
+  };
+
+  const handleAxisYChange = (e) => {
+    setAxisY(e.target.value);
+    setZoom({ scale: 1, offsetX: 0, offsetY: 0 });
+    setHoveredPoint(null);
+    setLockedPoint(null);
+  };
+
+  const getTopFeature = useCallback(
+    (pcKey) => {
+      if (!result || !result.loadings) return null;
+      const loadings = result.loadings[pcKey];
+      if (!loadings) return null;
+      let maxAbs = -Infinity;
+      let topFeature = null;
+      for (const [feat, val] of Object.entries(loadings)) {
+        if (Math.abs(val) > maxAbs) {
+          maxAbs = Math.abs(val);
+          topFeature = feat;
+        }
+      }
+      return topFeature;
+    },
+    [result],
+  );
+
+  const chartData = useMemo(() => {
+    if (!result || !result.pca_data) return null;
     const xs = result.pca_data.map((p) => p[axisX] ?? 0);
     const ys = result.pca_data.map((p) => p[axisY] ?? 0);
     const xMin = Math.min(...xs),
       xMax = Math.max(...xs);
     const yMin = Math.min(...ys),
       yMax = Math.max(...ys);
-    const toX = (v) => PAD + ((v - xMin) / (xMax - xMin || 1)) * (W - PAD * 2);
-    const toY = (v) =>
-      H - PAD - ((v - yMin) / (yMax - yMin || 1)) * (H - PAD * 2);
 
-    ctx.clearRect(0, 0, W, H);
-    ctx.strokeStyle = "#f0f0f0";
-    ctx.lineWidth = 1;
-    for (let i = 0; i <= 5; i++) {
-      const x = PAD + (i / 5) * (W - PAD * 2),
-        y = PAD + (i / 5) * (H - PAD * 2);
-      ctx.beginPath();
-      ctx.moveTo(x, PAD);
-      ctx.lineTo(x, H - PAD);
-      ctx.stroke();
-      ctx.beginPath();
-      ctx.moveTo(PAD, y);
-      ctx.lineTo(W - PAD, y);
-      ctx.stroke();
-    }
-    ctx.strokeStyle = "#dee2e6";
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(PAD, H - PAD);
-    ctx.lineTo(W - PAD, H - PAD);
-    ctx.stroke();
-    ctx.beginPath();
-    ctx.moveTo(PAD, PAD);
-    ctx.lineTo(PAD, H - PAD);
-    ctx.stroke();
-    ctx.fillStyle = "#868e96";
-    ctx.font = "bold 11px Arial";
-    ctx.textAlign = "center";
-    ctx.fillText(axisX, W / 2, H - 10);
+    const xMargin = (xMax - xMin) * 0.05 || 1;
+    const yMargin = (yMax - yMin) * 0.05 || 1;
+    const finalXMin = xMin - xMargin,
+      finalYMin = yMin - yMargin;
+    const xRange = xMax + xMargin - finalXMin || 1;
+    const yRange = yMax + yMargin - finalYMin || 1;
+
+    const toCanvasX = (v) =>
+      PAD + ((v - finalXMin) / xRange) * (CANVAS_WIDTH - PAD * 2);
+    const toCanvasY = (v) =>
+      CANVAS_HEIGHT -
+      PAD -
+      ((v - finalYMin) / yRange) * (CANVAS_HEIGHT - PAD * 2);
+
+    return result.pca_data.map((point, idx) => ({
+      originalIndex: idx,
+      cx: toCanvasX(point[axisX] ?? 0),
+      cy: toCanvasY(point[axisY] ?? 0),
+      cluster: result.clusters[idx],
+      color: CLUSTER_COLORS[result.clusters[idx] % CLUSTER_COLORS.length],
+    }));
+  }, [result, axisX, axisY]);
+
+  const tree = useMemo(() => {
+    if (!chartData) return null;
+    return quadtree()
+      .x((d) => d.cx)
+      .y((d) => d.cy)
+      .addAll(chartData);
+  }, [chartData]);
+
+  const activePointId = lockedPoint !== null ? lockedPoint : hoveredPoint;
+
+  useEffect(() => {
+    if (!chartData || !canvasRef.current) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas.getContext("2d", { alpha: false });
+
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    const { scale, offsetX, offsetY } = zoom;
     ctx.save();
-    ctx.translate(14, H / 2);
-    ctx.rotate(-Math.PI / 2);
-    ctx.fillText(axisY, 0, 0);
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
+
+    ctx.strokeStyle = "#f0f0f0";
+    ctx.lineWidth = 1 / scale;
+    ctx.beginPath();
+    for (let i = 0; i <= 5; i++) {
+      const x = PAD + (i / 5) * (CANVAS_WIDTH - PAD * 2);
+      const y = PAD + (i / 5) * (CANVAS_HEIGHT - PAD * 2);
+      ctx.moveTo(x, PAD);
+      ctx.lineTo(x, CANVAS_HEIGHT - PAD);
+      ctx.moveTo(PAD, y);
+      ctx.lineTo(CANVAS_WIDTH - PAD, y);
+    }
+    ctx.stroke();
+
+    ctx.strokeStyle = "#dee2e6";
+    ctx.lineWidth = 1.5 / scale;
+    ctx.beginPath();
+    ctx.moveTo(PAD, CANVAS_HEIGHT - PAD);
+    ctx.lineTo(CANVAS_WIDTH - PAD, CANVAS_HEIGHT - PAD);
+    ctx.moveTo(PAD, PAD);
+    ctx.lineTo(PAD, CANVAS_HEIGHT - PAD);
+    ctx.stroke();
     ctx.restore();
 
-    result.pca_data.forEach((point, idx) => {
-      const cx = toX(point[axisX] ?? 0),
-        cy = toY(point[axisY] ?? 0);
-      const color =
-        CLUSTER_COLORS[result.clusters[idx] % CLUSTER_COLORS.length];
-      const isH = hovered === idx;
+    const topFeatureX = getTopFeature(axisX);
+    const topFeatureY = getTopFeature(axisY);
+    const xLabel = topFeatureX ? `${axisX} (${topFeatureX})` : axisX;
+    const yLabel = topFeatureY ? `${axisY} (${topFeatureY})` : axisY;
+
+    ctx.fillStyle = "#868e96";
+    ctx.font = "bold 14px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText(xLabel, CANVAS_WIDTH / 2, CANVAS_HEIGHT - 15);
+    ctx.save();
+    ctx.translate(20, CANVAS_HEIGHT / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText(yLabel, 0, 0);
+    ctx.restore();
+
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
+
+    ctx.globalAlpha = 0.75;
+    chartData.forEach(({ cx, cy, color, originalIndex }) => {
+      if (activePointId === originalIndex) return;
       ctx.beginPath();
-      ctx.arc(cx, cy, isH ? 9 : 5, 0, Math.PI * 2);
+      ctx.arc(cx, cy, 5 / scale, 0, Math.PI * 2);
       ctx.fillStyle = color;
-      ctx.globalAlpha = isH ? 1 : 0.75;
       ctx.fill();
-      if (isH) {
-        ctx.strokeStyle = "#121212";
-        ctx.lineWidth = 1.5;
+    });
+
+    if (activePointId !== null) {
+      const activePoint = chartData[activePointId];
+      if (activePoint) {
         ctx.globalAlpha = 1;
+        ctx.beginPath();
+        ctx.arc(activePoint.cx, activePoint.cy, 8 / scale, 0, Math.PI * 2);
+        ctx.fillStyle = activePoint.color;
+        ctx.fill();
+        ctx.strokeStyle = "#121212";
+        ctx.lineWidth = 2 / scale;
         ctx.stroke();
       }
-      ctx.globalAlpha = 1;
-    });
-  }, [result, axisX, axisY, hovered]);
+    }
+    ctx.restore();
+  }, [chartData, activePointId, axisX, axisY, zoom, getTopFeature]);
 
-  const handleMouseMove = (e) => {
-    if (!result || !canvasRef.current) return;
-    const canvas = canvasRef.current,
-      rect = canvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const my = (e.clientY - rect.top) * (canvas.height / rect.height);
-    const PAD = 54,
-      W = canvas.width,
-      H = canvas.height;
-    const xs = result.pca_data.map((p) => p[axisX] ?? 0),
-      ys = result.pca_data.map((p) => p[axisY] ?? 0);
-    const xMin = Math.min(...xs),
-      xMax = Math.max(...xs),
-      yMin = Math.min(...ys),
-      yMax = Math.max(...ys);
-    const toX = (v) => PAD + ((v - xMin) / (xMax - xMin || 1)) * (W - PAD * 2);
-    const toY = (v) =>
-      H - PAD - ((v - yMin) / (yMax - yMin || 1)) * (H - PAD * 2);
-    let closest = null,
-      minD = 16;
-    result.pca_data.forEach((p, i) => {
-      const d = Math.sqrt(
-        (mx - toX(p[axisX] ?? 0)) ** 2 + (my - toY(p[axisY] ?? 0)) ** 2,
-      );
-      if (d < minD) {
-        minD = d;
-        closest = i;
-      }
-    });
-    setHovered(closest);
+  const handleMouseDown = (e) => {
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const cursorX = (e.clientX - rect.left) * (CANVAS_WIDTH / rect.width);
+    const cursorY = (e.clientY - rect.top) * (CANVAS_HEIGHT / rect.height);
+    setIsDragging(true);
+    hasDragged.current = false;
+    dragStart.current = {
+      x: cursorX - zoom.offsetX,
+      y: cursorY - zoom.offsetY,
+    };
   };
+
+  const handleMouseUp = () => {
+    setIsDragging(false);
+    if (!hasDragged.current && hoveredPoint !== null)
+      setLockedPoint(hoveredPoint);
+  };
+
+  const handleCanvasMouseMove = (e) => {
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const cursorX = (e.clientX - rect.left) * (CANVAS_WIDTH / rect.width);
+    const cursorY = (e.clientY - rect.top) * (CANVAS_HEIGHT / rect.height);
+
+    if (isDragging) {
+      hasDragged.current = true;
+      setZoom((prev) => ({
+        ...prev,
+        offsetX: cursorX - dragStart.current.x,
+        offsetY: cursorY - dragStart.current.y,
+      }));
+      return;
+    }
+
+    if (lockedPoint !== null) return;
+    if (!tree || hoverThrottle.current) return;
+    hoverThrottle.current = true;
+    requestAnimationFrame(() => (hoverThrottle.current = false));
+
+    const mx = (cursorX - zoom.offsetX) / zoom.scale;
+    const my = (cursorY - zoom.offsetY) / zoom.scale;
+    const closest = tree.find(mx, my, 20 / zoom.scale);
+    setHoveredPoint(closest ? closest.originalIndex : null);
+  };
+
+  const handleWheel = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!canvasRef.current) return;
+    const rect = canvasRef.current.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const zoomFactor = e.deltaY < 0 ? 1.15 : 1 / 1.15;
+
+    setZoom((prev) => {
+      const newScale = Math.min(Math.max(prev.scale * zoomFactor, 0.1), 10000);
+      const mouseXData = (mouseX - prev.offsetX) / prev.scale;
+      const mouseYData = (mouseY - prev.offsetY) / prev.scale;
+      return {
+        scale: newScale,
+        offsetX: mouseX - mouseXData * newScale,
+        offsetY: mouseY - mouseYData * newScale,
+      };
+    });
+  }, []);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const handler = (e) => handleWheel(e);
+    canvas.addEventListener("wheel", handler, { passive: false });
+    return () => canvas.removeEventListener("wheel", handler);
+  }, [handleWheel]);
+
+  const handleRowClick = (absoluteIndex) => {
+    setLockedPoint(absoluteIndex);
+    if (wrapperRef.current) {
+      wrapperRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  };
+
+  const totalPages = result
+    ? Math.ceil(result.pca_data.length / rowsPerPage)
+    : 0;
 
   return (
     <>
@@ -336,58 +616,192 @@ function PCADetail({ result }) {
           <span className={styles.sectionNum}>B</span>
           <h2 className={styles.sectionTitle}>Scatter Plot</h2>
           <div className={styles.axisSelectors}>
-            <span className={styles.axisLabel}>X:</span>
             <select
               className={styles.axisSelect}
               value={axisX}
-              onChange={(e) => setAxisX(e.target.value)}
+              onChange={handleAxisXChange}
             >
               {pcaKeys.map((k) => (
                 <option key={k}>{k}</option>
               ))}
             </select>
-            <span className={styles.axisLabel}>Y:</span>
             <select
               className={styles.axisSelect}
               value={axisY}
-              onChange={(e) => setAxisY(e.target.value)}
+              onChange={handleAxisYChange}
             >
               {pcaKeys.map((k) => (
                 <option key={k}>{k}</option>
               ))}
             </select>
+            {(zoom.scale !== 1 || zoom.offsetX !== 0 || zoom.offsetY !== 0) && (
+              <button
+                className={styles.pill}
+                onClick={() => setZoom({ scale: 1, offsetX: 0, offsetY: 0 })}
+              >
+                Reset View
+              </button>
+            )}
           </div>
         </div>
-        <div className={styles.chartArea}>
+        <div className={styles.chartArea} ref={wrapperRef}>
           <canvas
             ref={canvasRef}
-            width={760}
-            height={440}
+            width={CANVAS_WIDTH}
+            height={CANVAS_HEIGHT}
             className={styles.canvas}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={() => setHovered(null)}
+            style={{
+              touchAction: "none",
+              cursor: isDragging
+                ? "grabbing"
+                : activePointId !== null && lockedPoint === null
+                  ? "pointer"
+                  : "crosshair",
+            }}
+            onMouseDown={handleMouseDown}
+            onMouseUp={handleMouseUp}
+            onMouseLeave={() => {
+              setIsDragging(false);
+              if (lockedPoint === null) setHoveredPoint(null);
+            }}
+            onMouseMove={handleCanvasMouseMove}
           />
-          {hovered !== null && (
-            <div className={styles.tooltip}>
-              <div className={styles.tooltipTitle}>#{hovered + 1}</div>
+          {activePointId !== null && !isDragging && (
+            <div
+              className={`${styles.tooltip} ${lockedPoint !== null ? styles.tooltipLocked : ""}`}
+              style={{
+                minWidth: "260px",
+                pointerEvents: lockedPoint !== null ? "auto" : "none",
+                maxHeight: "350px",
+                overflowY: "auto",
+                paddingTop: lockedPoint !== null ? "24px" : "12px",
+              }}
+            >
+              {lockedPoint !== null && (
+                <button
+                  className={styles.tooltipCloseBtn}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setLockedPoint(null);
+                  }}
+                  style={{
+                    position: "absolute",
+                    top: "8px",
+                    right: "8px",
+                    background: "none",
+                    border: "none",
+                    color: "#fff",
+                    fontSize: "18px",
+                    cursor: "pointer",
+                    lineHeight: "1",
+                  }}
+                >
+                  ✕
+                </button>
+              )}
+              <div
+                className={styles.tooltipTitle}
+                style={{ color: "#fff", marginBottom: "8px" }}
+              >
+                {result.session?.label_column && result.original_data ? (
+                  <>
+                    <span
+                      style={{
+                        fontWeight: 400,
+                        color: "#aaa",
+                        fontSize: "12px",
+                        marginRight: "6px",
+                      }}
+                    >
+                      {result.session.label_column}:
+                    </span>
+                    {result.original_data[activePointId][
+                      result.session.label_column
+                    ] || "N/A"}
+                  </>
+                ) : (
+                  `Observation #${activePointId + 1}`
+                )}
+              </div>
               <div className={styles.tooltipRow}>
-                <span>Cluster</span>
+                <span style={{ color: "#ccc" }}>Cluster</span>
                 <span
                   style={{
                     color:
                       CLUSTER_COLORS[
-                        result.clusters[hovered] % CLUSTER_COLORS.length
+                        result.clusters[activePointId] % CLUSTER_COLORS.length
                       ],
                     fontWeight: 700,
+                    fontSize: "14px",
                   }}
                 >
-                  {result.clusters[hovered] + 1}
+                  {result.clusters[activePointId] + 1}
                 </span>
               </div>
+
+              <div
+                style={{
+                  margin: "8px 0",
+                  padding: "8px",
+                  background: "rgba(255, 255, 255, 0.1)",
+                  borderRadius: "6px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "11px",
+                    fontWeight: 600,
+                    color: "#bbb",
+                    textTransform: "uppercase",
+                    marginBottom: "6px",
+                  }}
+                >
+                  YOUR DATA
+                </div>
+                {(
+                  result.session?.columns ||
+                  (result.original_data
+                    ? Object.keys(result.original_data[activePointId]).filter(
+                        (k) => k !== result.session?.label_column,
+                      )
+                    : [])
+                ).map((col) => (
+                  <div
+                    key={`orig-${col}`}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      marginBottom: "4px",
+                    }}
+                  >
+                    <span style={{ color: "#ddd" }}>{col}</span>
+                    <span style={{ fontWeight: 800, color: "#fff" }}>
+                      {result.original_data &&
+                      result.original_data[activePointId]
+                        ? result.original_data[activePointId][col]
+                        : "N/A"}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div
+                style={{
+                  margin: "8px 0",
+                  borderTop: "1px solid rgba(255, 255, 255, 0.15)",
+                }}
+              />
+
               {pcaKeys.map((k) => (
-                <div key={k} className={styles.tooltipRow}>
-                  <span>{k}</span>
-                  <span>{(result.pca_data[hovered][k] ?? 0).toFixed(4)}</span>
+                <div
+                  key={k}
+                  className={styles.tooltipRow}
+                  style={{ marginBottom: "2px" }}
+                >
+                  <span style={{ color: "#ccc" }}>{k}</span>
+                  <span style={{ color: "#fff", fontWeight: 500 }}>
+                    {(result.pca_data[activePointId][k] ?? 0).toFixed(4)}
+                  </span>
                 </div>
               ))}
             </div>
@@ -411,59 +825,131 @@ function PCADetail({ result }) {
         </div>
       </div>
 
+      {result.cluster_metrics && (
+        <div className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionNum}>★</span>
+            <h2 className={styles.sectionTitle}>Cluster Quality Metrics</h2>
+          </div>
+          <div className={styles.metricsContainer}>
+            <div className={styles.metricBlock}>
+              <div className={styles.metricLabel}>Silhouette Score</div>
+              <div className={styles.metricValue}>
+                {result.cluster_metrics.silhouette_score}
+              </div>
+              <div className={styles.metricHint}>
+                Closer to 1 is better (denser clusters)
+              </div>
+            </div>
+            <div className={styles.metricBlock}>
+              <div className={styles.metricLabel}>Davies-Bouldin Index</div>
+              <div className={styles.metricValue}>
+                {result.cluster_metrics.davies_bouldin_score}
+              </div>
+              <div className={styles.metricHint}>
+                Lower is better (better separation)
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className={styles.section}>
         <div className={styles.sectionHeader}>
           <span className={styles.sectionNum}>C</span>
           <h2 className={styles.sectionTitle}>Results Table</h2>
-          <span className={styles.sectionHint}>
-            {result.pca_data.length} observations
-          </span>
         </div>
         <div className={styles.tableWrapper}>
           <table className={styles.table}>
             <thead>
               <tr>
                 <th>#</th>
+                {result.session?.label_column && (
+                  <th>{result.session.label_column}</th>
+                )}
                 <th>Cluster</th>
-                {pcaKeys.map((k) => (
-                  <th key={k}>{k}</th>
-                ))}
+                {pcaKeys.map((k) => {
+                  const topFeat = getTopFeature(k);
+                  return (
+                    <th key={k}>
+                      {k}
+                      {topFeat && (
+                        <span className={styles.thSubtext}>({topFeat})</span>
+                      )}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody>
-              {result.pca_data.slice(0, 100).map((row, i) => (
-                <tr
-                  key={i}
-                  className={hovered === i ? styles.rowHighlight : ""}
-                  onMouseEnter={() => setHovered(i)}
-                  onMouseLeave={() => setHovered(null)}
-                >
-                  <td>{i + 1}</td>
-                  <td>
-                    <span
-                      className={styles.clusterBadge}
-                      style={{
-                        background:
-                          CLUSTER_COLORS[
-                            result.clusters[i] % CLUSTER_COLORS.length
-                          ],
+              {result.pca_data
+                .slice(page * rowsPerPage, (page + 1) * rowsPerPage)
+                .map((row, relativeIndex) => {
+                  const absoluteIndex = page * rowsPerPage + relativeIndex;
+                  return (
+                    <tr
+                      key={absoluteIndex}
+                      className={`${styles.tableRowClickable} ${activePointId === absoluteIndex ? styles.rowHighlight : ""}`}
+                      onMouseEnter={() => {
+                        if (lockedPoint === null)
+                          setHoveredPoint(absoluteIndex);
                       }}
+                      onMouseLeave={() => {
+                        if (lockedPoint === null) setHoveredPoint(null);
+                      }}
+                      onClick={() => handleRowClick(absoluteIndex)}
                     >
-                      {result.clusters[i] + 1}
-                    </span>
-                  </td>
-                  {pcaKeys.map((k) => (
-                    <td key={k}>{(row[k] ?? 0).toFixed(4)}</td>
-                  ))}
-                </tr>
-              ))}
+                      <td>{absoluteIndex + 1}</td>
+                      {result.session?.label_column && result.original_data && (
+                        <td>
+                          {result.original_data[absoluteIndex][
+                            result.session.label_column
+                          ] || "N/A"}
+                        </td>
+                      )}
+                      <td>
+                        <span
+                          className={styles.clusterBadge}
+                          style={{
+                            background:
+                              CLUSTER_COLORS[
+                                result.clusters[absoluteIndex] %
+                                  CLUSTER_COLORS.length
+                              ],
+                          }}
+                        >
+                          {result.clusters[absoluteIndex] + 1}
+                        </span>
+                      </td>
+                      {pcaKeys.map((k) => (
+                        <td key={k}>{(row[k] ?? 0).toFixed(4)}</td>
+                      ))}
+                    </tr>
+                  );
+                })}
             </tbody>
           </table>
         </div>
-        {result.pca_data.length > 100 && (
-          <p className={styles.tableNote}>
-            Showing first 100 of {result.pca_data.length} rows
-          </p>
+        {totalPages > 1 && (
+          <div className={styles.paginationContainer}>
+            <button
+              className={styles.paginationBtn}
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={page === 0}
+            >
+              Previous
+            </button>
+            <span className={styles.paginationText}>
+              Page {page + 1} of {totalPages}
+            </span>
+            <button
+              className={styles.paginationBtn}
+              onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+              disabled={page >= totalPages - 1}
+            >
+              Next
+            </button>
+          </div>
         )}
       </div>
     </>
@@ -499,8 +985,8 @@ export default function HistoryDetailPage() {
                 : "Loading..."}
             </p>
           </div>
-          <a href="/profile" className={styles.backBtn}>
-            ← Back to profile
+          <a href="/history" className={styles.backBtn}>
+            ← Back to history
           </a>
         </div>
       </div>
