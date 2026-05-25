@@ -14,9 +14,11 @@ class TokenResponse(BaseModel):
     email: str
 
 class SettingsUpdate(BaseModel):
-    default_clusters: int = 3
-    preferred_pca_axes: str = "PC1,PC2"
-    theme: str = "light"
+    default_clusters: int
+    preferred_pca_axes: str
+    theme: str
+    correlation_method: Optional[str] = "pearson"
+    outlier_treatment: Optional[str] = "none"
 
 class CorrelationRequest(BaseModel):
     file_id: int

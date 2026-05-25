@@ -23,23 +23,35 @@ const CANVAS_WIDTH = 800;
 const CANVAS_HEIGHT = 500;
 const PAD = 60;
 
-export default function PCAView({ fileId, columns, numericCols }) {
+export default function PCAView({
+  fileId,
+  columns,
+  numericCols,
+  userSettings,
+}) {
   const canvasRef = useRef(null);
   const wrapperRef = useRef(null);
   const hoverThrottle = useRef(false);
   const hasDragged = useRef(false);
 
+  const defaultAxes = (userSettings?.preferred_pca_axes || "PC1,PC2").split(
+    ",",
+  );
+
+  const [searchTerm, setSearchTerm] = useState("");
   const [labelCol, setLabelCol] = useState("");
   const [selectedCols, setSelectedCols] = useState([]);
-  const [nClusters, setNClusters] = useState(3);
+  const [nClusters, setNClusters] = useState(
+    userSettings?.default_clusters || 3,
+  );
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   const [hoveredPoint, setHoveredPoint] = useState(null);
   const [lockedPoint, setLockedPoint] = useState(null);
-  const [axisX, setAxisX] = useState("PC1");
-  const [axisY, setAxisY] = useState("PC2");
+  const [axisX, setAxisX] = useState(defaultAxes[0] || "PC1");
+  const [axisY, setAxisY] = useState(defaultAxes[1] || "PC2");
 
   const [zoom, setZoom] = useState({ scale: 1, offsetX: 0, offsetY: 0 });
   const [isDragging, setIsDragging] = useState(false);
@@ -100,14 +112,14 @@ export default function PCAView({ fileId, columns, numericCols }) {
 
       const data = await response.json();
       setResult(data);
-      setAxisX("PC1");
-      setAxisY("PC2");
+      setAxisX(defaultAxes[0] || "PC1");
+      setAxisY(defaultAxes[1] || "PC2");
     } catch (e) {
       setError(e.message);
     } finally {
       setLoading(false);
     }
-  }, [selectedCols, fileId, labelCol, nClusters]);
+  }, [selectedCols, fileId, labelCol, nClusters, defaultAxes]);
 
   useEffect(() => {
     setZoom({ scale: 1, offsetX: 0, offsetY: 0 });
@@ -363,6 +375,13 @@ export default function PCAView({ fileId, columns, numericCols }) {
     }
   };
 
+  const filteredCols = useMemo(() => {
+    if (!searchTerm) return numericCols;
+    return numericCols.filter((c) =>
+      c.toLowerCase().includes(searchTerm.toLowerCase()),
+    );
+  }, [numericCols, searchTerm]);
+
   const pcaKeys = result ? Object.keys(result.pca_data[0]) : [];
   const totalPages = result
     ? Math.ceil(result.pca_data.length / rowsPerPage)
@@ -376,25 +395,22 @@ export default function PCAView({ fileId, columns, numericCols }) {
             <div className={styles.sectionHeader}>
               <span className={styles.sectionNum}>01</span>
               <h2 className={styles.sectionTitle}>Analysis Parameters</h2>
-              <span className={styles.sectionHint}>
-                Selected: {selectedCols.length}
+              <span className={styles.selectionCount}>
+                Selected: {selectedCols.length} / {numericCols.length}
               </span>
             </div>
 
             <div className={styles.settingsRow}>
-              <div className={styles.settingsBlock} style={{ flex: 1 }}>
-                <div
-                  style={{
-                    display: "flex",
-                    justifyContent: "space-between",
-                    alignItems: "center",
-                    marginBottom: "8px",
-                  }}
-                >
-                  <label className={styles.settingsLabel} style={{ margin: 0 }}>
-                    Variables for Analysis
-                  </label>
-                  <div style={{ display: "flex", gap: "8px" }}>
+              <div className={styles.settingsBlockFlex}>
+                <div className={styles.settingsSearchHeader}>
+                  <input
+                    type="text"
+                    placeholder="Search variables..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className={styles.searchInput}
+                  />
+                  <div className={styles.actionBtnGroup}>
                     <button
                       className={styles.pill}
                       onClick={() => setSelectedCols(numericCols)}
@@ -409,8 +425,9 @@ export default function PCAView({ fileId, columns, numericCols }) {
                     </button>
                   </div>
                 </div>
-                <div className={styles.pillGrid}>
-                  {numericCols.map((col) => (
+
+                <div className={styles.pillGridScrollable}>
+                  {filteredCols.map((col) => (
                     <button
                       key={col}
                       className={`${styles.pill} ${
@@ -421,10 +438,15 @@ export default function PCAView({ fileId, columns, numericCols }) {
                       {col}
                     </button>
                   ))}
+                  {filteredCols.length === 0 && (
+                    <span className={styles.emptySearch}>
+                      No variables found.
+                    </span>
+                  )}
                 </div>
               </div>
 
-              <div className={styles.settingsBlock} style={{ minWidth: 180 }}>
+              <div className={styles.settingsBlock}>
                 <label className={styles.settingsLabel}>
                   Number of Clusters (k)
                 </label>
@@ -443,7 +465,7 @@ export default function PCAView({ fileId, columns, numericCols }) {
                 </div>
               </div>
 
-              <div className={styles.settingsBlock} style={{ minWidth: 180 }}>
+              <div className={styles.settingsBlock}>
                 <label className={styles.settingsLabel}>Label Column</label>
                 <select
                   className={styles.axisSelect}
@@ -714,7 +736,8 @@ export default function PCAView({ fileId, columns, numericCols }) {
                         background: CLUSTER_COLORS[i % CLUSTER_COLORS.length],
                       }}
                     />
-                    Cluster {i + 1}
+                    Cluster {i + 1} (
+                    {result.clusters.filter((c) => c === i).length} obs.)
                   </div>
                 ))}
               </div>

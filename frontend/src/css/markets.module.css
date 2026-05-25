@@ -390,14 +390,15 @@
 
 .modalClose {
   position: absolute;
-  top: 14px;
+  top: 16px;
   right: 16px;
   background: none;
   border: none;
-  font-size: 1.1rem;
+  font-size: 1.2rem;
   cursor: pointer;
   color: #888;
   transition: color 0.15s;
+  z-index: 10;
 }
 
 .modalClose:hover {
@@ -411,6 +412,7 @@
   margin-bottom: 20px;
   flex-wrap: wrap;
   gap: 10px;
+  padding-right: 40px;
 }
 
 .modalSymbol {

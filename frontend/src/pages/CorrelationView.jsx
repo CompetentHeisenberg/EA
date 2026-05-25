@@ -53,13 +53,22 @@ function significanceLabel(pval) {
   return "";
 }
 
-export default function CorrelationView({ fileId, numericCols, fileName }) {
+export default function CorrelationView({
+  fileId,
+  numericCols,
+  fileName,
+  userSettings,
+}) {
   const heatmapRef = useRef(null);
 
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedCols, setSelectedCols] = useState([]);
-  const [corrMethod, setCorrMethod] = useState("pearson");
-  const [handleOutliers, setHandleOutliers] = useState(false);
+  const [corrMethod, setCorrMethod] = useState(
+    userSettings?.correlation_method || "pearson",
+  );
+  const [handleOutliers, setHandleOutliers] = useState(
+    userSettings?.outlier_treatment === "winsorize",
+  );
   const [corrData, setCorrData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);

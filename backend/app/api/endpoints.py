@@ -116,6 +116,35 @@ async def login(
 async def get_me(current_user: User = Depends(get_current_user)):
     return {"id": current_user.id, "username": current_user.username, "email": current_user.email}
 
+class PasswordChangeRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+@router.post("/auth/change-password")
+async def change_password(
+    data: PasswordChangeRequest,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=400, 
+            detail="Current password is not correct"
+        )
+    
+    if data.current_password == data.new_password:
+        raise HTTPException(
+            status_code=400, 
+            detail="The new password must be different from the current one"
+        )
+
+    current_user.hashed_password = hash_password(data.new_password)
+    
+    db.add(current_user)
+    await db.commit()
+    
+    return {"message": "Password was successfully changed"}
+
 @router.get("/settings")
 async def get_settings(
     current_user: User = Depends(get_current_user),
@@ -139,6 +168,8 @@ async def update_settings(
         settings.default_clusters = data.default_clusters
         settings.preferred_pca_axes = data.preferred_pca_axes
         settings.theme = data.theme
+        settings.correlation_method = data.correlation_method
+        settings.outlier_treatment = data.outlier_treatment
         await db.commit()
     return {"message": "Settings saved"}
 
@@ -274,7 +305,8 @@ async def get_pca(
             "variance": variance,
             "original_data": df_selected.to_dict(orient="records"),
             "loadings": loadings,
-            "cluster_metrics": cluster_metrics
+            "cluster_metrics": cluster_metrics,
+            "label_column": request.label_column
         }
 
         session = AnalysisSession(
@@ -284,7 +316,7 @@ async def get_pca(
             file_cols=len(request.columns),
             analysis_type="pca",
             columns_used=request.columns,
-            parameters={"n_clusters": request.n_clusters}
+            parameters={"n_clusters": request.n_clusters, "label_column": request.label_column}
         )
         db.add(session)
         await db.flush()
@@ -346,6 +378,8 @@ async def get_history_result(
         "session": {
             "id": session.id,
             "file_name": session.file_name,
+            "columns_used": session.columns_used,
+            "parameters": session.parameters,
             "analysis_type": session.analysis_type,
             "created_at": session.created_at.isoformat() if session.created_at else None,
         },

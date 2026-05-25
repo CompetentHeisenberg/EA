@@ -703,7 +703,7 @@ function PCADetail({ result }) {
                 className={styles.tooltipTitle}
                 style={{ color: "#fff", marginBottom: "8px" }}
               >
-                {result.session?.label_column && result.original_data ? (
+                {result.label_column && result.original_data ? (
                   <>
                     <span
                       style={{
@@ -713,11 +713,10 @@ function PCADetail({ result }) {
                         marginRight: "6px",
                       }}
                     >
-                      {result.session.label_column}:
+                      {result.label_column}:
                     </span>
-                    {result.original_data[activePointId][
-                      result.session.label_column
-                    ] || "N/A"}
+                    {result.original_data[activePointId][result.label_column] ||
+                      "N/A"}
                   </>
                 ) : (
                   `Observation #${activePointId + 1}`
@@ -762,7 +761,7 @@ function PCADetail({ result }) {
                   result.session?.columns ||
                   (result.original_data
                     ? Object.keys(result.original_data[activePointId]).filter(
-                        (k) => k !== result.session?.label_column,
+                        (k) => k !== result.label_column,
                       )
                     : [])
                 ).map((col) => (
@@ -864,9 +863,7 @@ function PCADetail({ result }) {
             <thead>
               <tr>
                 <th>#</th>
-                {result.session?.label_column && (
-                  <th>{result.session.label_column}</th>
-                )}
+                {result.label_column && <th>{result.label_column}</th>}
                 <th>Cluster</th>
                 {pcaKeys.map((k) => {
                   const topFeat = getTopFeature(k);
@@ -900,10 +897,10 @@ function PCADetail({ result }) {
                       onClick={() => handleRowClick(absoluteIndex)}
                     >
                       <td>{absoluteIndex + 1}</td>
-                      {result.session?.label_column && result.original_data && (
+                      {result.label_column && result.original_data && (
                         <td>
                           {result.original_data[absoluteIndex][
-                            result.session.label_column
+                            result.label_column
                           ] || "N/A"}
                         </td>
                       )}

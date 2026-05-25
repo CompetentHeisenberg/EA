@@ -2,6 +2,10 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import * as XLSX from "xlsx";
 import styles from "../css/markets.module.css";
 import { fetchMarkets } from "../services/api";
+import {
+  sentimentLabel as SentimentLabel,
+  workspaceIcons as WorkspaceIcons,
+} from "../assets/sentiment";
 
 const SECTORS = [
   "All",
@@ -159,6 +163,7 @@ const exportCSV = (data) => {
     "52W_Low",
     "DividendYield%",
   ];
+
   const rows = data.map((s) => [
     s.symbol,
     s.name,
@@ -173,8 +178,21 @@ const exportCSV = (data) => {
     s.week52Low,
     s.dividendYield,
   ]);
-  const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
-  const blob = new Blob([csv], { type: "text/csv" });
+
+  const escapeCSV = (val) => {
+    if (val === null || val === undefined) return "";
+    const str = String(val);
+    if (str.includes(",") || str.includes('"') || str.includes("\n")) {
+      return `"${str.replace(/"/g, '""')}"`;
+    }
+    return str;
+  };
+
+  const csv = [headers, ...rows]
+    .map((r) => r.map(escapeCSV).join(","))
+    .join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -234,7 +252,12 @@ const StockModal = ({ stock, onClose }) => {
                 : "$" + stock.price.toFixed(2)}
             </span>
             <span className={positive ? styles.posChange : styles.negChange}>
-              {positive ? "▲" : "▼"} {Math.abs(stock.change).toFixed(2)}%
+              {positive ? (
+                <SentimentLabel.positive.icon />
+              ) : (
+                <SentimentLabel.negative.icon />
+              )}{" "}
+              {Math.abs(stock.change).toFixed(2)}%
             </span>
           </div>
         </div>
@@ -325,9 +348,20 @@ const MarketsPage = () => {
   };
 
   const SortIcon = ({ col }) => {
-    if (sortKey !== col) return <span className={styles.sortIcon}>⇅</span>;
+    if (sortKey !== col)
+      return (
+        <span className={styles.sortIcon}>
+          <SentimentLabel.neutral.icon />
+        </span>
+      );
     return (
-      <span className={styles.sortActive}>{sortDir === "asc" ? "↑" : "↓"}</span>
+      <span className={styles.sortActive}>
+        {sortDir === "asc" ? (
+          <SentimentLabel.positive.icon />
+        ) : (
+          <SentimentLabel.negative.icon />
+        )}
+      </span>
     );
   };
 
@@ -370,14 +404,16 @@ const MarketsPage = () => {
           <button
             className={styles.exportBtn}
             onClick={() => exportCSV(filtered)}
+            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
           >
-            ↓ CSV
+            <WorkspaceIcons.upload /> CSV
           </button>
           <button
             className={styles.exportBtn}
             onClick={() => exportExcel(filtered)}
+            style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
           >
-            ↓ Excel
+            <WorkspaceIcons.upload /> Excel
           </button>
         </div>
       </div>
@@ -394,7 +430,13 @@ const MarketsPage = () => {
                   : idx.value.toLocaleString()}
               </div>
               <div className={isPositive ? styles.posChange : styles.negChange}>
-                {isPositive ? "+" : ""}
+                <span style={{ marginRight: "4px" }}>
+                  {isPositive ? (
+                    <SentimentLabel.positive.icon size={12} />
+                  ) : (
+                    <SentimentLabel.negative.icon size={12} />
+                  )}
+                </span>
                 {idx.change.toFixed(2)}
                 {idx.name === "10Y Treasury" ? "" : "%"}
               </div>
@@ -430,16 +472,18 @@ const MarketsPage = () => {
                 view === "table" ? styles.viewBtnActive : styles.viewBtn
               }
               onClick={() => setView("table")}
+              style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
             >
-              Table
+              <WorkspaceIcons.correlation /> Table
             </button>
             <button
               className={
                 view === "cards" ? styles.viewBtnActive : styles.viewBtn
               }
               onClick={() => setView("cards")}
+              style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}
             >
-              Cards
+              <WorkspaceIcons.pca /> Cards
             </button>
           </div>
         </div>
@@ -468,8 +512,17 @@ const MarketsPage = () => {
                     key={key}
                     className={styles.th}
                     onClick={() => handleSort(key)}
+                    style={{ cursor: "pointer" }}
                   >
-                    {label} <SortIcon col={key} />
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        gap: "0.25rem",
+                      }}
+                    >
+                      {label} <SortIcon col={key} />
+                    </div>
                   </th>
                 ))}
                 <th className={styles.th}>Trend</th>
@@ -503,7 +556,12 @@ const MarketsPage = () => {
                       s.change >= 0 ? styles.posChange : styles.negChange
                     }
                   >
-                    {s.change >= 0 ? "▲" : "▼"} {Math.abs(s.change).toFixed(2)}%
+                    {s.change >= 0 ? (
+                      <SentimentLabel.positive.icon />
+                    ) : (
+                      <SentimentLabel.negative.icon />
+                    )}{" "}
+                    {Math.abs(s.change).toFixed(2)}%
                   </td>
                   <td className={styles.td}>{s.volume}</td>
                   <td className={styles.td}>{s.mktCap}</td>
@@ -556,7 +614,12 @@ const MarketsPage = () => {
                   <span
                     className={positive ? styles.posChange : styles.negChange}
                   >
-                    {positive ? "▲" : "▼"} {Math.abs(s.change).toFixed(2)}%
+                    {positive ? (
+                      <SentimentLabel.positive.icon />
+                    ) : (
+                      <SentimentLabel.negative.icon />
+                    )}{" "}
+                    {Math.abs(s.change).toFixed(2)}%
                   </span>
                 </div>
                 <div className={styles.cardMeta}>

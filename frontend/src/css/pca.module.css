@@ -193,6 +193,7 @@
   flex-wrap: wrap;
   margin-bottom: 20px;
 }
+
 .settingsBlock {
   display: flex;
   flex-direction: column;
@@ -469,4 +470,54 @@
   font-size: 0.78rem;
   color: #868e96;
   margin-top: 10px;
+}
+
+.settingsSearchHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: nowrap;
+  gap: 16px;
+}
+
+.searchInput {
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font-size: 14px;
+  flex: 1;
+  min-width: 0;
+}
+
+.actionBtnGroup {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.pillGridScrollable {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-height: 250px;
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.settingsBlockFlex {
+  flex: 3;
+  display: flex;
+  flex-direction: column;
+  min-width: 300px;
+}
+
+.selectionCount {
+  color: #868e96;
+  font-size: 0.85rem;
+  margin-left: 16px;
+  align-self: center;
+}
+
+.settingsBlockSmall {
+  min-width: 180px;
 }

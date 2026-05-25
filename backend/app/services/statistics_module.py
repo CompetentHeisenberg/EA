@@ -75,13 +75,24 @@ def compute_correlation_matrix(data: dict, method: str = 'pearson') -> dict:
 class StatisticsEngine:
     def run_full_analysis(self, df: pd.DataFrame, n_clusters: int):
         n_clusters = min(n_clusters, df.shape[0] - 1)
+        n_components = min(3, df.shape[0], df.shape[1])
+        pca = PCA(n_components=n_components)
+        components = pca.fit_transform(df)
 
-        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
-        clusters = kmeans.fit_predict(df)
+        pca_cols = [f"PC{i+1}" for i in range(n_components)]
+        pca_df = pd.DataFrame(components, columns=pca_cols)
+
+        kmeans = KMeans(
+            n_clusters=n_clusters, 
+            init='k-means++',
+            random_state=42, 
+            n_init=10
+        )
+        clusters = kmeans.fit_predict(components)
 
         if len(set(clusters)) > 1:
-            sil_score = silhouette_score(df, clusters)
-            db_score = davies_bouldin_score(df, clusters)
+            sil_score = silhouette_score(components, clusters)
+            db_score = davies_bouldin_score(components, clusters)
         else:
             sil_score = 0.0
             db_score = 0.0
@@ -91,13 +102,6 @@ class StatisticsEngine:
             "silhouette_score": round(float(sil_score), 4),
             "davies_bouldin_score": round(float(db_score), 4),
         }
-
-        n_components = min(3, df.shape[0], df.shape[1])
-        pca = PCA(n_components=n_components)
-        components = pca.fit_transform(df)
-
-        pca_cols = [f"PC{i+1}" for i in range(n_components)]
-        pca_df = pd.DataFrame(components, columns=pca_cols)
 
         loadings = pd.DataFrame(
             pca.components_.T,

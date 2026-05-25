@@ -4,6 +4,7 @@ import {
   updateSettings,
   fetchHistory,
   fetchHistoryResult,
+  changePassword,
 } from "../services/api";
 import styles from "../css/profile.module.css";
 
@@ -31,9 +32,11 @@ function corrToColor(v) {
   const a = Math.abs(val);
   return `rgb(${Math.round(220 - 220 * a)},${Math.round(220 - 220 * a)},${Math.round(220 + (255 - 220) * a)})`;
 }
+
 function textColor(v) {
   return Math.abs(v) > 0.6 ? "#fff" : "#222";
 }
+
 function sigLabel(p) {
   if (p < 0.01) return "***";
   if (p < 0.05) return "**";
@@ -160,8 +163,11 @@ export default function ProfilePage() {
   const [settings, setSettings] = useState({
     default_clusters: 3,
     preferred_pca_axes: "PC1,PC2",
+    correlation_method: "pearson",
+    outlier_treatment: "none",
     theme: "light",
   });
+
   const [history, setHistory] = useState([]);
   const [settingsSaved, setSettingsSaved] = useState(false);
   const [loadingSettings, setLoadingSettings] = useState(true);
@@ -172,9 +178,20 @@ export default function ProfilePage() {
   const [results, setResults] = useState({});
   const [loadingId, setLoadingId] = useState(null);
 
+  const [passwords, setPasswords] = useState({
+    current: "",
+    new: "",
+    confirm: "",
+  });
+  const [pwdStatus, setPwdStatus] = useState({
+    loading: false,
+    error: "",
+    success: false,
+  });
+
   useEffect(() => {
     fetchSettings()
-      .then(setSettings)
+      .then((data) => setSettings((prev) => ({ ...prev, ...data })))
       .catch(console.error)
       .finally(() => setLoadingSettings(false));
     fetchHistory()
@@ -215,6 +232,37 @@ export default function ProfilePage() {
     }
   };
 
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    if (passwords.new !== passwords.confirm) {
+      setPwdStatus({
+        loading: false,
+        error: "New passwords do not match",
+        success: false,
+      });
+      return;
+    }
+    setPwdStatus({ loading: true, error: "", success: false });
+    try {
+      await changePassword({
+        current_password: passwords.current,
+        new_password: passwords.new,
+      });
+      setPwdStatus({ loading: false, error: "", success: true });
+      setPasswords({ current: "", new: "", confirm: "" });
+      setTimeout(
+        () => setPwdStatus((prev) => ({ ...prev, success: false })),
+        3000,
+      );
+    } catch (err) {
+      setPwdStatus({
+        loading: false,
+        error: err.response?.data?.detail || "Failed to change password",
+        success: false,
+      });
+    }
+  };
+
   const handleLogout = () => {
     localStorage.clear();
     window.location.href = "/login";
@@ -227,7 +275,7 @@ export default function ProfilePage() {
           <div>
             <h1 className={styles.pageTitle}>User Profile</h1>
             <p className={styles.pageDesc}>
-              Personal Data · Settings · Analysis History
+              Personal Data · Settings · Security · Analysis History
             </p>
           </div>
           <button className={styles.logoutBtn} onClick={handleLogout}>
@@ -270,42 +318,101 @@ export default function ProfilePage() {
               </div>
             ) : (
               <>
-                <div className={styles.settingRow}>
-                  <label className={styles.settingLabel}>
-                    Default number of clusters
-                  </label>
-                  <div className={styles.clusterBtns}>
-                    {[2, 3, 4, 5, 6].map((k) => (
-                      <button
-                        key={k}
-                        className={`${styles.clusterBtn} ${settings.default_clusters === k ? styles.clusterBtnActive : ""}`}
-                        onClick={() =>
-                          setSettings({ ...settings, default_clusters: k })
-                        }
-                      >
-                        {k}
-                      </button>
-                    ))}
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
+                    gap: "24px",
+                    marginBottom: "24px",
+                  }}
+                >
+                  <div className={styles.settingRow}>
+                    <label className={styles.settingLabel}>
+                      Default number of clusters
+                    </label>
+                    <div className={styles.clusterBtns}>
+                      {[2, 3, 4, 5, 6].map((k) => (
+                        <button
+                          key={k}
+                          className={`${styles.clusterBtn} ${settings.default_clusters === k ? styles.clusterBtnActive : ""}`}
+                          onClick={() =>
+                            setSettings({ ...settings, default_clusters: k })
+                          }
+                        >
+                          {k}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className={styles.settingRow}>
+                    <label className={styles.settingLabel}>
+                      Default PCA axes
+                    </label>
+                    <div className={styles.axisOptions}>
+                      {["PC1,PC2", "PC1,PC3", "PC2,PC3"].map((axes) => (
+                        <button
+                          key={axes}
+                          className={`${styles.pill} ${settings.preferred_pca_axes === axes ? styles.pillActive : ""}`}
+                          onClick={() =>
+                            setSettings({
+                              ...settings,
+                              preferred_pca_axes: axes,
+                            })
+                          }
+                        >
+                          {axes.replace(",", " / ")}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className={styles.settingRow}>
+                    <label className={styles.settingLabel}>
+                      Correlation method
+                    </label>
+                    <div className={styles.axisOptions}>
+                      {["pearson", "spearman"].map((method) => (
+                        <button
+                          key={method}
+                          className={`${styles.pill} ${settings.correlation_method === method ? styles.pillActive : ""}`}
+                          onClick={() =>
+                            setSettings({
+                              ...settings,
+                              correlation_method: method,
+                            })
+                          }
+                        >
+                          {method.charAt(0).toUpperCase() + method.slice(1)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className={styles.settingRow}>
+                    <label className={styles.settingLabel}>
+                      Outlier treatment
+                    </label>
+                    <div className={styles.axisOptions}>
+                      {["none", "winsorize"].map((treatment) => (
+                        <button
+                          key={treatment}
+                          className={`${styles.pill} ${settings.outlier_treatment === treatment ? styles.pillActive : ""}`}
+                          onClick={() =>
+                            setSettings({
+                              ...settings,
+                              outlier_treatment: treatment,
+                            })
+                          }
+                        >
+                          {treatment.charAt(0).toUpperCase() +
+                            treatment.slice(1)}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
-                <div className={styles.settingRow}>
-                  <label className={styles.settingLabel}>
-                    Default PCA axes
-                  </label>
-                  <div className={styles.axisOptions}>
-                    {["PC1,PC2", "PC1,PC3", "PC2,PC3"].map((axes) => (
-                      <button
-                        key={axes}
-                        className={`${styles.pill} ${settings.preferred_pca_axes === axes ? styles.pillActive : ""}`}
-                        onClick={() =>
-                          setSettings({ ...settings, preferred_pca_axes: axes })
-                        }
-                      >
-                        {axes.replace(",", " / ")}
-                      </button>
-                    ))}
-                  </div>
-                </div>
+
                 <button
                   className={styles.saveBtn}
                   onClick={handleSaveSettings}
@@ -330,6 +437,108 @@ export default function ProfilePage() {
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
             <span className={styles.sectionNum}>03</span>
+            <h2 className={styles.sectionTitle}>Security</h2>
+          </div>
+          <form
+            onSubmit={handlePasswordChange}
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px",
+              maxWidth: "400px",
+            }}
+          >
+            <div className={styles.settingRow} style={{ marginBottom: "0" }}>
+              <label className={styles.settingLabel}>Current Password</label>
+              <input
+                type="password"
+                className={styles.inputField}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  borderRadius: "6px",
+                  border: "1px solid #e2e8f0",
+                  marginTop: "8px",
+                }}
+                value={passwords.current}
+                onChange={(e) =>
+                  setPasswords({ ...passwords, current: e.target.value })
+                }
+                required
+              />
+            </div>
+            <div className={styles.settingRow} style={{ marginBottom: "0" }}>
+              <label className={styles.settingLabel}>New Password</label>
+              <input
+                type="password"
+                className={styles.inputField}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  borderRadius: "6px",
+                  border: "1px solid #e2e8f0",
+                  marginTop: "8px",
+                }}
+                value={passwords.new}
+                onChange={(e) =>
+                  setPasswords({ ...passwords, new: e.target.value })
+                }
+                required
+              />
+            </div>
+            <div className={styles.settingRow} style={{ marginBottom: "0" }}>
+              <label className={styles.settingLabel}>
+                Confirm New Password
+              </label>
+              <input
+                type="password"
+                className={styles.inputField}
+                style={{
+                  width: "100%",
+                  padding: "10px",
+                  borderRadius: "6px",
+                  border: "1px solid #e2e8f0",
+                  marginTop: "8px",
+                }}
+                value={passwords.confirm}
+                onChange={(e) =>
+                  setPasswords({ ...passwords, confirm: e.target.value })
+                }
+                required
+              />
+            </div>
+
+            {pwdStatus.error && (
+              <div
+                style={{ color: "#d90429", fontSize: "14px", marginTop: "4px" }}
+              >
+                {pwdStatus.error}
+              </div>
+            )}
+
+            <button
+              type="submit"
+              className={styles.saveBtn}
+              disabled={pwdStatus.loading}
+              style={{ alignSelf: "flex-start", marginTop: "8px" }}
+            >
+              {pwdStatus.loading ? (
+                <>
+                  <div className={styles.btnSpinner} />
+                  Updating...
+                </>
+              ) : pwdStatus.success ? (
+                "✓ Password Updated"
+              ) : (
+                "Change Password"
+              )}
+            </button>
+          </form>
+        </div>
+
+        <div className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <span className={styles.sectionNum}>04</span>
             <h2 className={styles.sectionTitle}>Analysis History</h2>
             <span className={styles.sectionHint}>{history.length} records</span>
           </div>

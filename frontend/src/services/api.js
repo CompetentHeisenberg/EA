@@ -136,3 +136,20 @@ export const fetchMarkets = async () => {
   if (!response.ok) throw new Error("Network error");
   return response.json();
 };
+
+export const changePassword = async (data) => {
+  const response = await authFetch("/api/auth/change-password", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw { response: { data: errorData } };
+  }
+
+  return response.json();
+};

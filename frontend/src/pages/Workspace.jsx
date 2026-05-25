@@ -1,8 +1,9 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import CorrelationView from "./CorrelationView";
 import PCAView from "./PCAView";
 import styles from "../css/workspace.module.css";
 import { workspaceIcons } from "../assets/sentiment";
+import { fetchSettings } from "../services/api";
 
 export default function Workspace() {
   const [activeTab, setActiveTab] = useState("upload");
@@ -13,7 +14,15 @@ export default function Workspace() {
   const [uploadStatus, setUploadStatus] = useState(null);
   const [uploadMessage, setUploadMessage] = useState("");
 
+  const [userSettings, setUserSettings] = useState(null);
+
   const fileInputRef = useRef(null);
+
+  useEffect(() => {
+    fetchSettings()
+      .then((data) => setUserSettings(data))
+      .catch(console.error);
+  }, []);
 
   const handleFileUpload = async (event) => {
     const file = event.target.files?.[0];
@@ -271,6 +280,7 @@ export default function Workspace() {
               fileId={fileId}
               numericCols={numericCols}
               fileName={fileName}
+              userSettings={userSettings}
             />
           )}
 
@@ -280,6 +290,7 @@ export default function Workspace() {
               columns={columns}
               numericCols={numericCols}
               fileName={fileName}
+              userSettings={userSettings}
             />
           )}
         </section>

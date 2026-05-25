@@ -42,6 +42,8 @@ class UserSettings(Base):
     default_clusters = Column(Integer, default=3)
     preferred_pca_axes = Column(String(10), default="PC1,PC2")
     theme = Column(String(20), default="light")
+    correlation_method = Column(String, default="pearson")
+    outlier_treatment = Column(String, default="none")
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
 
