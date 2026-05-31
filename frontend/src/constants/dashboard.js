@@ -1,0 +1,1 @@
+export const DATA_POLLING_INTERVAL = 60000;
