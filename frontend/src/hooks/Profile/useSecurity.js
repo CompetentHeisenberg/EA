@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import { changePassword } from "../../services/api";
 
+const check = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+
 export const useSecurity = () => {
   const [passwords, setPasswords] = useState({
     current: "",
@@ -24,6 +26,13 @@ export const useSecurity = () => {
         setPwdStatus({
           loading: false,
           error: "New passwords do not match",
+          success: false,
+        });
+        return;
+      } else if (!check.test(passwords.new)) {
+        setPwdStatus({
+          loading: false,
+          error: "The new password does not meet the security requirements",
           success: false,
         });
         return;

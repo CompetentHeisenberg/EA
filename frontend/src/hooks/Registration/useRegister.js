@@ -1,6 +1,8 @@
 import { useState, useCallback } from "react";
 import { registerUser } from "../../services/auth";
 
+const check = /^(?=.*[A-Za-z])(?=.*\d).{8,}$/;
+
 export const useRegister = () => {
   const [formData, setFormData] = useState({
     username: "",
@@ -27,8 +29,10 @@ export const useRegister = () => {
         return;
       }
 
-      if (formData.password.length < 6) {
-        setError("Password must be at least 6 characters long");
+      if (!check.test(formData.password)) {
+        setError(
+          "Password must be at least 8 characters long and contain at least one letter and one number",
+        );
         return;
       }
 

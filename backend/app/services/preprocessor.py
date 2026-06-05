@@ -9,16 +9,23 @@ class Preprocessor:
 
     def clean_and_validate(self, df: pd.DataFrame, handle_outliers: bool = False):
         df_numeric = df.select_dtypes(include=[np.number]).copy()
-        
+
         if df_numeric.empty:
             raise ValueError("There are no numeric columns in the file!")
+
+        constant_cols = [c for c in df_numeric.columns if df_numeric[c].nunique(dropna=True) <= 1]
+        if constant_cols:
+            df_numeric = df_numeric.drop(columns=constant_cols)
+
+        if df_numeric.empty:
+            raise ValueError("All columns are constant after cleaning!")
 
         if handle_outliers:
             for col in df_numeric.columns:
                 lower = df_numeric[col].quantile(0.01)
                 upper = df_numeric[col].quantile(0.99)
                 df_numeric[col] = np.clip(df_numeric[col], lower, upper)
-            
+
         data_imputed = self.imputer.fit_transform(df_numeric)
         return pd.DataFrame(data_imputed, columns=df_numeric.columns)
 
@@ -27,6 +34,6 @@ class Preprocessor:
             scaler = RobustScaler()
         else:
             scaler = StandardScaler()
-            
+
         scaled_data = scaler.fit_transform(df)
         return pd.DataFrame(scaled_data, columns=df.columns)

@@ -7,6 +7,7 @@ import { MarketControls } from "../components/Markets/MarketControls";
 import { TableView } from "../components/Markets/TableView";
 import { CardsView } from "../components/Markets/CardsView";
 import { StockModal } from "../components/Markets/StockModal";
+import { FullScreenLoader } from "../components/Markets/FullScreenLoader";
 import styles from "../css/markets.module.css";
 
 export default function MarketsPage() {
@@ -26,23 +27,7 @@ export default function MarketsPage() {
   const [view, setView] = useState("table");
 
   if (loading) {
-    return (
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          height: "100vh",
-          gap: "1rem",
-        }}
-      >
-        <div className={styles.loaderSpinner}></div>
-        <div style={{ color: "#000", fontSize: "1.2rem", fontWeight: "bold" }}>
-          Loading real-time market data...
-        </div>
-      </div>
-    );
+    return <FullScreenLoader message="Loading real-time market data..." />;
   }
 
   return (
