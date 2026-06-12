@@ -1,6 +1,7 @@
 import os
 import io
 import pandas as pd
+import numpy as np
 from fastapi import UploadFile, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -60,6 +61,7 @@ async def process_file_upload(file: UploadFile, current_user: User, db: AsyncSes
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
 async def execute_correlation(request: CorrelationRequest, current_user: User, db: AsyncSession):
     try:
         file_path = os.path.join(TEMP_DATA_DIR, f"{request.file_id}.parquet")
@@ -72,12 +74,21 @@ async def execute_correlation(request: CorrelationRequest, current_user: User, d
         if missing_cols:
             raise HTTPException(status_code=400, detail=f"Columns not found: {missing_cols}")
 
-        df_selected = df[request.columns].dropna()
+        df_selected = df[request.columns]
+        df_selected = df_selected.select_dtypes(include=[np.number])
         
+        if df_selected.shape[1] < 2:
+            raise ValueError("Select at least 2 numeric columns for correlation")
+
+        df_selected = df_selected.dropna()
+        
+        if df_selected.shape[0] < 3:
+            raise ValueError("Insufficient numeric data after dropping empty rows")
+
         if request.handle_outliers:
             df_selected = preprocessor.clean_and_validate(df_selected, handle_outliers=True)
 
-        data_dict = {col: df_selected[col].tolist() for col in request.columns}
+        data_dict = {col: df_selected[col].tolist() for col in df_selected.columns}
         result = compute_correlation_matrix(data_dict, method=request.method)
 
         session = AnalysisSession(
@@ -97,9 +108,12 @@ async def execute_correlation(request: CorrelationRequest, current_user: User, d
 
         return result
     except ValueError as e:
+        print(f"\n--- CORRELATION ERROR (400): {str(e)} ---\n") 
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        print(f"\n--- CRITICAL ERROR (500): {str(e)} ---\n")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 async def execute_pca(request: PCARequest, current_user: User, db: AsyncSession):
     try:
@@ -115,11 +129,20 @@ async def execute_pca(request: PCARequest, current_user: User, db: AsyncSession)
 
         cols_to_extract = request.columns.copy()
         if request.label_column and request.label_column in df.columns:
-            cols_to_extract.append(request.label_column)
+            if request.label_column not in cols_to_extract:
+                cols_to_extract.append(request.label_column)
 
         df_selected = df[cols_to_extract].dropna()
+        
+        if df_selected.shape[0] < 3:
+            raise ValueError("Insufficient data after dropping empty rows")
 
         df_for_math = df_selected[request.columns]
+        df_for_math = df_for_math.select_dtypes(include=[np.number])
+        
+        if df_for_math.shape[1] < 2:
+            raise ValueError("PCA requires at least 2 numeric columns")
+
         df_scaled = preprocessor.scale_data(df_for_math)
         
         clusters, pca_df, variance, loadings, cluster_metrics = stats_engine.run_full_analysis(df_scaled, request.n_clusters)
@@ -150,8 +173,13 @@ async def execute_pca(request: PCARequest, current_user: User, db: AsyncSession)
         await db.commit()
 
         return result
+    except ValueError as e:
+        print(f"\n--- PCA ERROR (400): {str(e)} ---\n")
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        print(f"\n--- CRITICAL PCA ERROR (500): {str(e)} ---\n")
         raise HTTPException(status_code=500, detail=str(e))
+
 
 async def fetch_user_history(current_user: User, db: AsyncSession):
     result = await db.execute(
@@ -172,6 +200,7 @@ async def fetch_user_history(current_user: User, db: AsyncSession):
         }
         for s in sessions
     ]
+
 
 async def fetch_history_record(session_id: int, current_user: User, db: AsyncSession):
     query = (

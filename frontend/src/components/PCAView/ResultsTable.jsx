@@ -23,6 +23,7 @@ export const ResultsTable = ({
         <span className={styles.sectionNum}>04</span>
         <h2 className={styles.sectionTitle}>Results Table</h2>
       </div>
+
       <div className={styles.tableWrapper}>
         <table className={styles.table}>
           <thead>
@@ -36,16 +37,7 @@ export const ResultsTable = ({
                   <th key={k}>
                     {k}
                     {topFeat && (
-                      <span
-                        style={{
-                          display: "block",
-                          fontSize: "11px",
-                          color: "#888",
-                          fontWeight: "normal",
-                        }}
-                      >
-                        ({topFeat})
-                      </span>
+                      <span className={styles.thSubtext}>({topFeat})</span>
                     )}
                   </th>
                 );
@@ -105,38 +97,23 @@ export const ResultsTable = ({
       </div>
 
       {totalPages > 1 && (
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            padding: "16px",
-            background: "#f8f9fa",
-            borderTop: "1px solid #e9ecef",
-          }}
-        >
+        <div className={styles.paginationContainer}>
           <button
-            className={styles.pill}
+            className={styles.paginationBtn}
             onClick={() => setPage((p) => Math.max(0, p - 1))}
             disabled={page === 0}
-            style={{ opacity: page === 0 ? 0.5 : 1 }}
           >
             Previous
           </button>
-          <span
-            style={{
-              fontSize: "14px",
-              color: "#495057",
-              fontWeight: 500,
-            }}
-          >
+
+          <span className={styles.paginationText}>
             Page {page + 1} of {totalPages}
           </span>
+
           <button
-            className={styles.pill}
+            className={styles.paginationBtn}
             onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
             disabled={page >= totalPages - 1}
-            style={{ opacity: page >= totalPages - 1 ? 0.5 : 1 }}
           >
             Next
           </button>
